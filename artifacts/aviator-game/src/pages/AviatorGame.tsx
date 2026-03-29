@@ -42,7 +42,7 @@ export default function AviatorGame() {
               multiplier={game.multiplier}
               crashPoint={game.crashPoint}
               waitProgress={game.waitProgress}
-              trailPoints={game.trailPoints}
+              elapsedMs={game.elapsedMs}
               plane={game.plane}
               betMode={betMode}
               onToggleBetMode={toggleBetMode}

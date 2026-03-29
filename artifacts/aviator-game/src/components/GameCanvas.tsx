@@ -1,28 +1,20 @@
 import { useRef, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
-import type { Phase, CurvePoint, PlaneTransform } from '../hooks/useGameState'
+import type { Phase, PlaneTransform } from '../hooks/useGameState'
+import { computeMultiplier, mapX, mapY, MAX_X } from '../hooks/useGameState'
 
 interface GameCanvasProps {
   phase: Phase
   multiplier: number
   crashPoint: number
   waitProgress: number
-  trailPoints: CurvePoint[]
+  elapsedMs: number
   plane: PlaneTransform
   betMode: 'money' | 'freebet'
   onToggleBetMode: () => void
 }
 
 const PAD = { left: 44, right: 16, top: 20, bottom: 20 }
-
-function toPx(p: CurvePoint, w: number, h: number) {
-  const dw = w - PAD.left - PAD.right
-  const dh = h - PAD.top - PAD.bottom
-  return {
-    cx: PAD.left + p.x * dw,
-    cy: PAD.top + (1 - p.y) * dh,
-  }
-}
 
 // ── Background with radiating rays ─────────────────────────────────────────
 
@@ -113,58 +105,64 @@ function drawAxes(ctx: CanvasRenderingContext2D, w: number, h: number) {
 
 // ── Trail curve ────────────────────────────────────────────────────────────
 
-function traceSmoothCurve(target: CanvasRenderingContext2D | Path2D, pts: { cx: number; cy: number }[]) {
-  target.moveTo(pts[0].cx, pts[0].cy)
-  if (pts.length === 2) { target.lineTo(pts[1].cx, pts[1].cy); return }
-  const tangents: { x: number; y: number }[] = []
-  for (let i = 0; i < pts.length; i++) {
-    if (i === 0) {
-      tangents.push({ x: pts[1].cx - pts[0].cx, y: pts[1].cy - pts[0].cy })
-    } else if (i === pts.length - 1) {
-      tangents.push({ x: pts[i].cx - pts[i - 1].cx, y: pts[i].cy - pts[i - 1].cy })
-    } else {
-      tangents.push({ x: (pts[i + 1].cx - pts[i - 1].cx) / 2, y: (pts[i + 1].cy - pts[i - 1].cy) / 2 })
-    }
-  }
-  for (let i = 0; i < pts.length - 1; i++) {
-    const cp1x = pts[i].cx + tangents[i].x / 3
-    const cp1y = pts[i].cy + tangents[i].y / 3
-    const cp2x = pts[i + 1].cx - tangents[i + 1].x / 3
-    const cp2y = pts[i + 1].cy - tangents[i + 1].y / 3
-    target.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, pts[i + 1].cx, pts[i + 1].cy)
-  }
-}
+const NUM_CURVE_PTS = 80
 
 function drawTrail(
   ctx: CanvasRenderingContext2D,
   w: number,
   h: number,
-  points: CurvePoint[]
+  elMs: number
 ) {
-  if (points.length < 2) return
-  const ox  = PAD.left
-  const oy  = h - PAD.bottom
+  if (elMs < 10) return
+  const dw = w - PAD.left - PAD.right
+  const dh = h - PAD.top - PAD.bottom
+  const ox = PAD.left
+  const oy = h - PAD.bottom
 
-  const raw = points[0].x > 0.001 || points[0].y > 0.001
-    ? [{ x: 0, y: 0 }, ...points]
-    : points
-  const pts = raw.map((p) => toPx(p, w, h))
+  const steps = NUM_CURVE_PTS
+  const pxPts: { cx: number; cy: number }[] = []
+
+  for (let i = 0; i <= steps; i++) {
+    const t = (i / steps) * elMs
+    const nx = mapX(t)
+    const mult = computeMultiplier(t)
+    const ny = mapY(mult)
+    pxPts.push({ cx: ox + nx * dw, cy: PAD.top + (1 - ny) * dh })
+    if (nx >= MAX_X) break
+  }
+
+  const finalMult = computeMultiplier(elMs)
+  const finalNy = mapY(finalMult)
+  const finalNx = mapX(elMs)
+  const lastPx = { cx: ox + finalNx * dw, cy: PAD.top + (1 - finalNy) * dh }
+  const lastGen = pxPts[pxPts.length - 1]
+  if (Math.abs(lastPx.cx - lastGen.cx) > 0.5 || Math.abs(lastPx.cy - lastGen.cy) > 0.5) {
+    pxPts.push(lastPx)
+  }
+
+  if (pxPts.length < 2) return
 
   ctx.save()
   ctx.beginPath()
-  ctx.rect(ox, PAD.top, w - PAD.left - PAD.right, oy - PAD.top)
+  ctx.rect(ox, PAD.top, dw, dh)
   ctx.clip()
 
   const curvePath = new Path2D()
-  traceSmoothCurve(curvePath, pts)
+  curvePath.moveTo(pxPts[0].cx, pxPts[0].cy)
+  for (let i = 1; i < pxPts.length; i++) {
+    curvePath.lineTo(pxPts[i].cx, pxPts[i].cy)
+  }
 
   ctx.beginPath()
-  traceSmoothCurve(ctx, pts)
-  ctx.lineTo(pts[pts.length - 1].cx, oy)
-  ctx.lineTo(pts[0].cx, oy)
+  ctx.moveTo(pxPts[0].cx, pxPts[0].cy)
+  for (let i = 1; i < pxPts.length; i++) {
+    ctx.lineTo(pxPts[i].cx, pxPts[i].cy)
+  }
+  ctx.lineTo(pxPts[pxPts.length - 1].cx, oy)
+  ctx.lineTo(pxPts[0].cx, oy)
   ctx.closePath()
 
-  const g = ctx.createLinearGradient(0, pts[pts.length - 1].cy, 0, oy)
+  const g = ctx.createLinearGradient(0, pxPts[pxPts.length - 1].cy, 0, oy)
   g.addColorStop(0,    'rgba(0,230,118,0.9)')
   g.addColorStop(0.25, 'rgba(0,210,100,0.75)')
   g.addColorStop(0.5,  'rgba(0,180,80,0.55)')
@@ -479,7 +477,7 @@ export function GameCanvas({
   multiplier,
   crashPoint,
   waitProgress,
-  trailPoints,
+  elapsedMs,
   plane,
   betMode,
   onToggleBetMode,
@@ -536,8 +534,8 @@ export function GameCanvas({
       }
 
       // ── FLYING: trail + animated plane ──────────────────────────────
-      if (isFlying && trailPoints.length >= 2) {
-        drawTrail(ctx, CW, CH, trailPoints)
+      if (isFlying && elapsedMs > 10) {
+        drawTrail(ctx, CW, CH, elapsedMs)
       }
       if (isFlying && !plane.offScreen) {
         const tailX    = PAD.left + plane.nx * dw
@@ -560,7 +558,7 @@ export function GameCanvas({
 
       rafRef.current = requestAnimationFrame(render)
     },
-    [phase, trailPoints, plane]
+    [phase, elapsedMs, plane]
   )
 
   useEffect(() => {

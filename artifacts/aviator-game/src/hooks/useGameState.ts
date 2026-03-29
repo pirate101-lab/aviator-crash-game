@@ -2,11 +2,6 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 
 export type Phase = 'waiting' | 'flying' | 'crashing' | 'crashed'
 
-export interface CurvePoint {
-  x: number
-  y: number
-}
-
 export interface PlaneTransform {
   nx: number
   ny: number
@@ -22,7 +17,7 @@ export interface GameState {
   crashPoint: number
   waitProgress: number
   roundHistory: number[]
-  trailPoints: CurvePoint[]
+  elapsedMs: number
   plane: PlaneTransform
   serverSeedHash: string
   nonce: number
@@ -33,22 +28,20 @@ const WAIT_MS           = 5000
 const CRASH_DISPLAY_MS  = 3000
 const FLY_AWAY_MS       = 700
 const MAX_HISTORY       = 20
-const POINT_INTERVAL_MS = 60
 
-function computeMultiplier(ms: number): number {
+export function computeMultiplier(ms: number): number {
   return Math.pow(Math.E, 0.00006 * ms)
 }
 
-const MAX_X = 0.92
-const MAX_Y = 0.85
+export const MAX_X = 0.92
+export const MAX_Y = 0.85
+export const TRAVERSE_MS = 10000
 
-const TRAVERSE_MS = 10000
-
-function mapX(elMs: number): number {
+export function mapX(elMs: number): number {
   return Math.min(MAX_X, (elMs / TRAVERSE_MS) * MAX_X)
 }
 
-function mapY(mult: number): number {
+export function mapY(mult: number): number {
   const v = Math.max(0, mult - 1)
   return Math.min(MAX_Y, Math.sqrt(v) * MAX_Y + 0.02 * Math.min(1, v * 10))
 }
@@ -114,7 +107,7 @@ export function useGameState(): GameState {
   const [crashPoint, setCrashPoint] = useState(0)
   const [waitProgress, setWaitProg] = useState(0)
   const [roundHistory, setHistory]  = useState<number[]>(INITIAL_HISTORY)
-  const [trailPoints, setTrail]     = useState<CurvePoint[]>([])
+  const [elapsedMs, setElapsedMs]   = useState(0)
   const [plane, setPlane]           = useState<PlaneTransform>(DEFAULT_PLANE)
 
   // Provably fair state
@@ -127,8 +120,6 @@ export function useGameState(): GameState {
   const tStart       = useRef(0)
   const cpRef        = useRef(0)
   const phaseRef     = useRef<Phase>('waiting')
-  const lastPtMs     = useRef(0)
-  const trailBuf     = useRef<CurvePoint[]>([])
   const planeRef     = useRef<PlaneTransform>(DEFAULT_PLANE)
   const nonceRef     = useRef(1)
   const serverSeedRef = useRef<string>('')
@@ -152,8 +143,7 @@ export function useGameState(): GameState {
 
     // Reset visual state immediately while async work runs
     setPhase('waiting'); setMultiplier(1); setCrashPoint(0); setWaitProg(0)
-    setTrail([]); setPlane(DEFAULT_PLANE); setRevealedSeed('')
-    trailBuf.current = []
+    setElapsedMs(0); setPlane(DEFAULT_PLANE); setRevealedSeed('')
 
     // Async: hash server seed for display + compute crash point
     const roundNonce = nonceRef.current
@@ -182,10 +172,8 @@ export function useGameState(): GameState {
   const startFly = useCallback(() => {
     stop()
     phaseRef.current = 'flying'
-    lastPtMs.current = 0
-    trailBuf.current = [{ x: 0, y: 0.012 }]
-    setPhase('flying'); setMultiplier(1)
-    setTrail([{ x: 0, y: 0.012 }]); setPlane({ ...DEFAULT_PLANE })
+    setPhase('flying'); setMultiplier(1); setElapsedMs(0)
+    setPlane({ ...DEFAULT_PLANE })
     tStart.current = performance.now()
 
     const tick = (now: number) => {
@@ -197,17 +185,11 @@ export function useGameState(): GameState {
       if (mult >= cp) { setMultiplier(cp); startCrash(); return }
 
       setMultiplier(mult)
+      setElapsedMs(el)
 
       const nx      = mapX(el)
       const ny      = mapY(mult)
       const angle   = tiltDeg(ny, el)
-
-      if (el - lastPtMs.current >= POINT_INTERVAL_MS) {
-        lastPtMs.current = el
-        const pt: CurvePoint = { x: nx, y: ny }
-        trailBuf.current = [...trailBuf.current.slice(-399), pt]
-        setTrail([...trailBuf.current])
-      }
 
       const ratio = Math.min(1, ny / MAX_Y)
       const bobStrength = ratio > 0.6 ? (ratio - 0.6) / 0.4 * 0.012 : 0
@@ -270,7 +252,7 @@ export function useGameState(): GameState {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
-    phase, multiplier, crashPoint, waitProgress, roundHistory, trailPoints, plane,
+    phase, multiplier, crashPoint, waitProgress, roundHistory, elapsedMs, plane,
     serverSeedHash, nonce, revealedSeed,
   }
 }

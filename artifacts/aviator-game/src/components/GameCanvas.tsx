@@ -531,12 +531,19 @@ export function GameCanvas({
 
       drawAxes(ctx, CW, CH)
 
-      // ── WAITING: plane rests with tail at origin, nose tilted upper-right ──
+      // ── WAITING: plane rests in positive quadrant, tail near origin corner ──
+      // WAIT_ANGLE: 30° so the plane clearly points into the positive X,Y area.
+      // liftY: lifts the plane so even the fuselage belly (3.5 local px below
+      // centreline) clears the X-axis. The visible tail end sits just above and
+      // to the right of where the two green axes meet.
       if (isWaiting) {
-        const WAIT_ANGLE = 0.26          // ~15° upward tilt in radians
+        const WAIT_ANGLE = 0.52          // 30° upward tilt in radians
         const PLANE_LEN  = 94            // nose-to-tail length in local px
-        const noseX = originX + PLANE_LEN * Math.cos(WAIT_ANGLE)
-        const noseY = originY - PLANE_LEN * Math.sin(WAIT_ANGLE)
+        const BELLY_DEPTH = 3.5          // max fuselage extent below centreline
+        const MARGIN = 6                 // extra clearance in canvas px
+        const liftY  = Math.ceil(BELLY_DEPTH * Math.cos(WAIT_ANGLE)) + MARGIN
+        const noseX  = originX + PLANE_LEN * Math.cos(WAIT_ANGLE)
+        const noseY  = originY - PLANE_LEN * Math.sin(WAIT_ANGLE) - liftY
         drawPlane(ctx, noseX, noseY, WAIT_ANGLE, false)
       }
 

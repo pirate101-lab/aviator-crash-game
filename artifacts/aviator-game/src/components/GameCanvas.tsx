@@ -15,11 +15,6 @@ interface GameCanvasProps {
 
 const PAD = { left: 44, right: 16, top: 20, bottom: 36 }
 
-const SPRITE_DRAW_W = 90
-const SPRITE_NATIVE_ANGLE_RAD = (30 * Math.PI) / 180
-const TAIL_OFFSET_X = -6
-const TAIL_OFFSET_Y = 0
-
 function toPx(p: CurvePoint, w: number, h: number) {
   const dw = w - PAD.left - PAD.right
   const dh = h - PAD.top - PAD.bottom
@@ -29,26 +24,23 @@ function toPx(p: CurvePoint, w: number, h: number) {
   }
 }
 
+// ── Background with radiating rays ─────────────────────────────────────────
+
 function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number) {
-  // Very dark base
   ctx.fillStyle = '#0e0e0e'
   ctx.fillRect(0, 0, w, h)
 
-  // Radiating rays from graph origin (bottom-left corner)
-  const ox = PAD.left
-  const oy = h - PAD.bottom
-  const maxDist = Math.sqrt(w * w + h * h) * 1.5
-  const numRays = 28
-
-  // Fan covers upper-right quadrant plus some extra
-  const fanStart = -Math.PI        // pointing left (180°)
-  const fanEnd   = -Math.PI * 0.02 // pointing slightly past up (90°)
+  const ox       = PAD.left
+  const oy       = h - PAD.bottom
+  const maxDist  = Math.sqrt(w * w + h * h) * 1.5
+  const numRays  = 28
+  const fanStart = -Math.PI
+  const fanEnd   = -Math.PI * 0.02
   const fanSpan  = fanEnd - fanStart
 
   for (let i = 0; i < numRays; i++) {
     const a1 = fanStart + (i / numRays) * fanSpan
     const a2 = fanStart + ((i + 0.45) / numRays) * fanSpan
-
     ctx.beginPath()
     ctx.moveTo(ox, oy)
     ctx.lineTo(ox + Math.cos(a1) * maxDist, oy + Math.sin(a1) * maxDist)
@@ -58,41 +50,32 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number) {
     ctx.fill()
   }
 
-  // Warm golden glow at origin
   const glow = ctx.createRadialGradient(ox, oy, 0, ox, oy, Math.min(w, h) * 0.7)
-  glow.addColorStop(0, 'rgba(160,110,30,0.28)')
+  glow.addColorStop(0,    'rgba(160,110,30,0.28)')
   glow.addColorStop(0.15, 'rgba(120,80,20,0.18)')
-  glow.addColorStop(0.4, 'rgba(80,50,10,0.07)')
-  glow.addColorStop(1, 'transparent')
+  glow.addColorStop(0.4,  'rgba(80,50,10,0.07)')
+  glow.addColorStop(1,    'transparent')
   ctx.fillStyle = glow
   ctx.fillRect(0, 0, w, h)
 }
 
+// ── Axes ───────────────────────────────────────────────────────────────────
+
 function drawAxes(ctx: CanvasRenderingContext2D, w: number, h: number) {
   const ox = PAD.left
   const oy = h - PAD.bottom
-
   ctx.save()
   ctx.strokeStyle = 'rgba(0,230,118,0.55)'
-  ctx.lineWidth = 2
+  ctx.lineWidth   = 2
   ctx.shadowColor = 'rgba(0,230,118,0.35)'
-  ctx.shadowBlur = 6
-
-  // Y-axis
-  ctx.beginPath()
-  ctx.moveTo(ox, PAD.top)
-  ctx.lineTo(ox, oy)
-  ctx.stroke()
-
-  // X-axis
-  ctx.beginPath()
-  ctx.moveTo(ox, oy)
-  ctx.lineTo(w - PAD.right, oy)
-  ctx.stroke()
-
+  ctx.shadowBlur  = 6
+  ctx.beginPath(); ctx.moveTo(ox, PAD.top); ctx.lineTo(ox, oy); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(w - PAD.right, oy); ctx.stroke()
   ctx.shadowBlur = 0
   ctx.restore()
 }
+
+// ── Trail curve ────────────────────────────────────────────────────────────
 
 function drawTrail(
   ctx: CanvasRenderingContext2D,
@@ -102,9 +85,8 @@ function drawTrail(
   crashed: boolean
 ) {
   if (points.length < 2) return
-  const ox = PAD.left
-  const oy = h - PAD.bottom
-
+  const ox  = PAD.left
+  const oy  = h - PAD.bottom
   const pts = points.map((p) => toPx(p, w, h))
 
   ctx.save()
@@ -121,7 +103,7 @@ function drawTrail(
   }
   curvePath.lineTo(pts[pts.length - 1].cx, pts[pts.length - 1].cy)
 
-  // Fill area
+  // Fill area under curve
   ctx.beginPath()
   ctx.moveTo(pts[0].cx, pts[0].cy)
   for (let i = 1; i < pts.length - 1; i++) {
@@ -138,34 +120,33 @@ function drawTrail(
     ctx.fillStyle = 'rgba(80,80,80,0.12)'
   } else {
     const g = ctx.createLinearGradient(0, pts[pts.length - 1].cy, 0, oy)
-    g.addColorStop(0, 'rgba(0,230,118,0.9)')
+    g.addColorStop(0,    'rgba(0,230,118,0.9)')
     g.addColorStop(0.25, 'rgba(0,210,100,0.75)')
-    g.addColorStop(0.5, 'rgba(0,180,80,0.55)')
+    g.addColorStop(0.5,  'rgba(0,180,80,0.55)')
     g.addColorStop(0.75, 'rgba(0,140,60,0.3)')
-    g.addColorStop(1, 'rgba(0,80,40,0.05)')
+    g.addColorStop(1,    'rgba(0,80,40,0.05)')
     ctx.fillStyle = g
   }
   ctx.fill()
 
-  // Stroke
   if (crashed) {
     ctx.strokeStyle = 'rgba(100,100,100,0.5)'
-    ctx.lineWidth = 2.5
+    ctx.lineWidth   = 2.5
     ctx.setLineDash([5, 4])
   } else {
     ctx.strokeStyle = '#00E676'
-    ctx.lineWidth = 3.5
+    ctx.lineWidth   = 3.5
     ctx.shadowColor = 'rgba(0,230,118,0.9)'
-    ctx.shadowBlur = 14
+    ctx.shadowBlur  = 14
   }
   ctx.lineJoin = 'round'
-  ctx.lineCap = 'round'
+  ctx.lineCap  = 'round'
   ctx.stroke(curvePath)
 
   if (!crashed) {
     ctx.strokeStyle = 'rgba(160,255,210,0.45)'
-    ctx.lineWidth = 1.5
-    ctx.shadowBlur = 0
+    ctx.lineWidth   = 1.5
+    ctx.shadowBlur  = 0
     ctx.stroke(curvePath)
   }
 
@@ -174,29 +155,132 @@ function drawTrail(
   ctx.restore()
 }
 
-function drawPlaneSprite(
+// ── Code-drawn business jet ────────────────────────────────────────────────
+//
+// Local coordinate system:
+//   (0, 0) = nose tip, pointing right (+X)
+//   Fuselage extends to the left (−X), wings/fins extend up (−Y)
+//   Total span: ~98px left, ~30px up for wings
+//
+// Call with:
+//   ctx.translate(noseTipX, noseTipY)
+//   ctx.rotate(−angleRad)   [where angleRad = 0 is horizontal]
+
+function drawPlane(
   ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
   tipX: number,
   tipY: number,
-  angleRad: number
+  angleRad: number,
+  crashed = false
 ) {
-  if (!img.complete || img.naturalWidth === 0) return
-
-  const aspect = img.naturalHeight / img.naturalWidth
-  const drawW = SPRITE_DRAW_W
-  const drawH = drawW * aspect
+  const bodyFill    = crashed ? 'rgba(130,130,130,0.82)' : 'rgba(218,234,218,0.95)'
+  const wingFill    = crashed ? 'rgba(110,110,110,0.75)' : 'rgba(200,220,200,0.90)'
+  const stroke      = crashed ? 'rgba(110,110,110,0.6)'  : '#00E676'
+  const cockpitFill = crashed ? 'rgba(90,90,90,0.5)'     : 'rgba(80,200,130,0.55)'
 
   ctx.save()
-  ctx.shadowColor = 'rgba(0,230,118,0.5)'
-  ctx.shadowBlur = 18
   ctx.translate(tipX, tipY)
-  ctx.rotate(-(angleRad - SPRITE_NATIVE_ANGLE_RAD))
-  const anchorX = drawW + TAIL_OFFSET_X
-  const anchorY = drawH / 2 + TAIL_OFFSET_Y
-  ctx.drawImage(img, -anchorX, -anchorY, drawW, drawH)
+  ctx.rotate(-angleRad)
+
+  if (!crashed) {
+    ctx.shadowColor = '#00E676'
+    ctx.shadowBlur  = 16
+  }
+
+  ctx.lineJoin = 'round'
+  ctx.lineCap  = 'round'
+  ctx.lineWidth = 1.5
+
+  // ── Main Wing (large swept-back, most prominent feature) ──────────────
+  ctx.beginPath()
+  ctx.moveTo(-26, -4.5)      // root leading edge (on upper fuselage)
+  ctx.lineTo(-70, -27)       // wingtip forward point
+  ctx.lineTo(-75, -22)       // wingtip aft point
+  ctx.bezierCurveTo(-70, -18, -60, -8, -58, -4.5)  // sweep back to root trailing
+  ctx.closePath()
+  ctx.fillStyle   = wingFill
+  ctx.strokeStyle = stroke
+  ctx.fill()
+  ctx.stroke()
+
+  // ── Vertical Tail Fin ─────────────────────────────────────────────────
+  ctx.beginPath()
+  ctx.moveTo(-80, -4.5)      // fin base front
+  ctx.bezierCurveTo(-80, -10, -83, -17, -86, -24)  // leading edge curves up
+  ctx.lineTo(-91, -4.5)      // fin base rear
+  ctx.closePath()
+  ctx.fillStyle   = wingFill
+  ctx.strokeStyle = stroke
+  ctx.fill()
+  ctx.stroke()
+
+  // ── Horizontal Stabilizer ─────────────────────────────────────────────
+  ctx.beginPath()
+  ctx.moveTo(-80, -4.5)      // root leading edge
+  ctx.lineTo(-94, -15)       // tip forward
+  ctx.lineTo(-96, -11)       // tip aft
+  ctx.bezierCurveTo(-92, -8, -88, -5, -86, -4.5)  // sweep back to root
+  ctx.closePath()
+  ctx.fillStyle   = wingFill
+  ctx.strokeStyle = stroke
+  ctx.fill()
+  ctx.stroke()
+
+  // ── Fuselage (main body — drawn on top of wing/tail roots) ───────────
+  ctx.beginPath()
+  // Start at nose tip (0,0)
+  ctx.moveTo(0, 0)
+  // Upper surface: nose → cockpit hump → flat → tail taper
+  ctx.bezierCurveTo(-2, -1.5, -6, -4.5, -12, -5.2)   // nose / cockpit rise
+  ctx.bezierCurveTo(-18, -5.8, -22, -6.2, -28, -6)   // cockpit top
+  ctx.bezierCurveTo(-35, -5.8, -55, -5.2, -72, -4.8) // long upper flat run
+  ctx.bezierCurveTo(-80, -4.5, -87, -3.5, -92, -1.5) // tail taper upper
+  // Tail end
+  ctx.lineTo(-94, 0)
+  // Lower surface: tail → belly → nose
+  ctx.bezierCurveTo(-88, 2, -75, 3.2, -55, 3.5)      // tail to belly
+  ctx.bezierCurveTo(-35, 3.5, -18, 2.8, -6, 1.2)     // belly to nose lower
+  ctx.bezierCurveTo(-3, 0.6, -1, 0.2, 0, 0)          // nose lower close
+  ctx.closePath()
+  ctx.fillStyle   = bodyFill
+  ctx.strokeStyle = stroke
+  ctx.fill()
+  ctx.stroke()
+
+  // ── Cockpit Window ────────────────────────────────────────────────────
+  ctx.shadowBlur = 0
+  ctx.beginPath()
+  ctx.moveTo(-6, -4.5)
+  ctx.bezierCurveTo(-10, -5.2, -16, -6.5, -24, -6.2)
+  ctx.bezierCurveTo(-27, -6.0, -30, -5.5, -32, -4.8)
+  ctx.lineTo(-10, -4.8)
+  ctx.closePath()
+  ctx.fillStyle   = cockpitFill
+  ctx.strokeStyle = 'transparent'
+  ctx.fill()
+
+  // ── Engine nacelles (rear-mounted, on fuselage sides near tail) ───────
+  if (!crashed) ctx.shadowBlur = 6
+
+  // Port engine
+  ctx.beginPath()
+  ctx.ellipse(-70, 2.5, 11, 3.2, -0.08, 0, Math.PI * 2)
+  ctx.fillStyle   = wingFill
+  ctx.strokeStyle = stroke
+  ctx.fill()
+  ctx.stroke()
+
+  // Starboard engine intake highlight
+  ctx.beginPath()
+  ctx.ellipse(-70, 2.5, 5, 2.2, -0.08, Math.PI, Math.PI * 2)
+  ctx.fillStyle = 'rgba(0,0,0,0.35)'
+  ctx.fill()
+
+  ctx.shadowBlur = 0
   ctx.restore()
 }
+
+// ── Exhaust particles ──────────────────────────────────────────────────────
 
 function drawExhaust(
   ctx: CanvasRenderingContext2D,
@@ -209,12 +293,12 @@ function drawExhaust(
   ctx.translate(tipX, tipY)
   ctx.rotate(-angleRad)
 
-  for (let i = 0; i < 10; i++) {
-    const offset = (time * 0.004 + i * 0.12) % 1
-    const x = -18 - offset * 70
-    const y = Math.sin(time * 0.012 + i * 0.8) * 2.5
-    const size = (1 - offset) * 5 + 1.5
-    const alpha = (1 - offset) * 0.55
+  for (let i = 0; i < 12; i++) {
+    const offset = (time * 0.004 + i * 0.1) % 1
+    const x      = -94 - offset * 55
+    const y      = Math.sin(time * 0.012 + i * 0.9) * 2
+    const size   = (1 - offset) * 4.5 + 1
+    const alpha  = (1 - offset) * 0.5
 
     ctx.beginPath()
     ctx.arc(x, y, size, 0, Math.PI * 2)
@@ -225,7 +309,7 @@ function drawExhaust(
   ctx.restore()
 }
 
-// ── JSX Overlays ─────────────────────────────────────────────────────────────
+// ── JSX Overlays ──────────────────────────────────────────────────────────
 
 function BetModeToggle({
   betMode,
@@ -290,44 +374,29 @@ function NautilusSpinner() {
       viewBox="0 0 64 64"
       fill="none"
     >
-      <defs>
-        <radialGradient id="nautilusGrad" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#00E676" stopOpacity="1" />
-          <stop offset="100%" stopColor="#00C853" stopOpacity="0.6" />
-        </radialGradient>
-      </defs>
       {Array.from({ length: blades }, (_, i) => {
         const step      = (Math.PI * 2) / blades
         const a0        = step * i
-        const a1        = step * i + step * 0.88   // wide blade coverage
+        const a1        = step * i + step * 0.88
         const innerR    = 5
         const outerR    = 28
         const outerMidR = 22
         const innerMidR = 10
 
-        // Outer arc: starts at a0, ends at a1
         const ox0 = cx + outerR * Math.cos(a0)
         const oy0 = cy + outerR * Math.sin(a0)
         const ox1 = cx + outerR * Math.cos(a1)
         const oy1 = cy + outerR * Math.sin(a1)
-
-        // Control points for the swirl curve
         const cp1x = cx + outerMidR * Math.cos(a0 + step * 0.6)
         const cp1y = cy + outerMidR * Math.sin(a0 + step * 0.6)
-
-        // Inner arc: ends at a0, starts at a1 (reverse sweep for nautilus)
         const ix0 = cx + innerR * Math.cos(a0)
         const iy0 = cy + innerR * Math.sin(a0)
         const ix1 = cx + innerR * Math.cos(a1)
         const iy1 = cy + innerR * Math.sin(a1)
-
         const cp2x = cx + innerMidR * Math.cos(a0 + step * 0.2)
         const cp2y = cy + innerMidR * Math.sin(a0 + step * 0.2)
-
-        // Large arc flag depends on whether the arc spans > 180°
         const largeArc = a1 - a0 > Math.PI ? 1 : 0
-
-        const alpha = 0.6 + (i / blades) * 0.4
+        const alpha    = 0.6 + (i / blades) * 0.4
 
         return (
           <path
@@ -346,7 +415,6 @@ function NautilusSpinner() {
           />
         )
       })}
-      {/* Centre */}
       <circle cx={cx} cy={cy} r="5.5" fill="#00E676" />
       <circle cx={cx} cy={cy} r="3"   fill="#0a0a0a" />
     </svg>
@@ -388,7 +456,7 @@ function DecorationDots() {
   )
 }
 
-// ── Main Component ───────────────────────────────────────────────────────────
+// ── Main Component ────────────────────────────────────────────────────────
 
 export function GameCanvas({
   phase,
@@ -401,15 +469,7 @@ export function GameCanvas({
   onToggleBetMode,
 }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const spriteRef = useRef<HTMLImageElement | null>(null)
   const rafRef    = useRef(0)
-
-  useEffect(() => {
-    const img = new Image()
-    img.src = `${import.meta.env.BASE_URL}plane-sprite.png`
-    img.crossOrigin = 'anonymous'
-    spriteRef.current = img
-  }, [])
 
   const render = useCallback(
     (time: number = 0) => {
@@ -443,40 +503,39 @@ export function GameCanvas({
       const isFlying   = phase === 'flying'
       const isWaiting  = phase === 'waiting'
 
-      const dw = CW - PAD.left - PAD.right
-      const dh = CH - PAD.top  - PAD.bottom
+      const dw      = CW - PAD.left - PAD.right
+      const dh      = CH - PAD.top  - PAD.bottom
       const originX = PAD.left
       const originY = CH - PAD.bottom
 
       drawAxes(ctx, CW, CH)
 
-      // WAITING — plane parked at origin
-      if (isWaiting && spriteRef.current) {
-        const waitAngle = (20 * Math.PI) / 180
-        drawPlaneSprite(ctx, spriteRef.current, originX, originY, waitAngle)
+      // ── WAITING: plane parked exactly at graph origin, horizontal ────
+      if (isWaiting) {
+        drawPlane(ctx, originX, originY, 0, false)
       }
 
-      // FLYING — trail + live plane
+      // ── FLYING: trail + animated plane ──────────────────────────────
       if (isFlying && trailPoints.length >= 2) {
         drawTrail(ctx, CW, CH, trailPoints, false)
       }
-      if (isFlying && spriteRef.current && !plane.offScreen) {
-        const tipX    = PAD.left + plane.nx * dw
-        const tipY    = PAD.top  + (1 - plane.ny) * dh
+      if (isFlying && !plane.offScreen) {
+        const tipX     = PAD.left + plane.nx * dw
+        const tipY     = PAD.top  + (1 - plane.ny) * dh
         const angleRad = (plane.angleDeg * Math.PI) / 180
         drawExhaust(ctx, tipX, tipY, angleRad, time)
-        drawPlaneSprite(ctx, spriteRef.current, tipX, tipY, angleRad)
+        drawPlane(ctx, tipX, tipY, angleRad, false)
       }
 
-      // CRASHING / CRASHED
+      // ── CRASHING / CRASHED ───────────────────────────────────────────
       if ((isCrashing || isCrashed) && trailPoints.length >= 2) {
         drawTrail(ctx, CW, CH, trailPoints, true)
       }
-      if (isCrashing && spriteRef.current && !plane.offScreen) {
-        const tipX    = PAD.left + (plane.nx + plane.crashOffsetX) * dw
-        const tipY    = PAD.top  + (1 - (plane.ny + plane.crashOffsetY)) * dh
+      if (isCrashing && !plane.offScreen) {
+        const tipX     = PAD.left + (plane.nx + plane.crashOffsetX) * dw
+        const tipY     = PAD.top  + (1 - (plane.ny + plane.crashOffsetY)) * dh
         const angleRad = (plane.angleDeg * Math.PI) / 180
-        drawPlaneSprite(ctx, spriteRef.current, tipX, tipY, angleRad)
+        drawPlane(ctx, tipX, tipY, angleRad, true)
       }
 
       rafRef.current = requestAnimationFrame(render)
@@ -491,7 +550,6 @@ export function GameCanvas({
 
   const isCrashed = phase === 'crashed' || phase === 'crashing'
   const isWaiting = phase === 'waiting'
-  const waitSecs  = Math.max(0, ((100 - waitProgress) / 100) * 5).toFixed(1)
 
   return (
     <div className="relative w-full h-full overflow-hidden rounded-lg">
@@ -503,7 +561,7 @@ export function GameCanvas({
 
       <DecorationDots />
 
-      {/* Top-left: bet mode toggle + network */}
+      {/* Top-left: bet mode toggle + network status */}
       <div className="absolute top-2 left-2 z-10 flex flex-col gap-0.5">
         <BetModeToggle betMode={betMode} onToggle={onToggleBetMode} />
         <NetworkStatus />
@@ -517,7 +575,6 @@ export function GameCanvas({
             <div className="text-white font-bold text-sm tracking-widest uppercase">
               WAITING FOR NEXT ROUND
             </div>
-            {/* Progress bar */}
             <div className="mt-2 mx-auto w-40 h-1 bg-white/20 rounded-full overflow-hidden">
               <div
                 className="h-full bg-white rounded-full transition-all"

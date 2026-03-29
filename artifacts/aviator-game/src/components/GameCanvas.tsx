@@ -74,8 +74,9 @@ function drawDots(ctx: CanvasRenderingContext2D, w: number, h: number, time: num
     const x = ox + (1 - t) * bLen
     const y = oy
     const fade = t > 0.85 ? (1 - t) / 0.15 : 1
+    const r = 3 * (0.3 + 0.7 * (1 - t))
     ctx.beginPath()
-    ctx.arc(x, y, 3, 0, Math.PI * 2)
+    ctx.arc(x, y, r, 0, Math.PI * 2)
     ctx.fillStyle = `rgba(0,230,118,${0.7 * fade})`
     ctx.fill()
   }
@@ -85,8 +86,9 @@ function drawDots(ctx: CanvasRenderingContext2D, w: number, h: number, time: num
     const x = ox
     const y = oy - (1 - t) * lLen
     const fade = t > 0.85 ? (1 - t) / 0.15 : 1
+    const r = 3 * (0.3 + 0.7 * (1 - t))
     ctx.beginPath()
-    ctx.arc(x, y, 3, 0, Math.PI * 2)
+    ctx.arc(x, y, r, 0, Math.PI * 2)
     ctx.fillStyle = `rgba(0,230,118,${0.7 * fade})`
     ctx.fill()
   }
@@ -522,7 +524,7 @@ export function GameCanvas({
       const originX = PAD.left
       const originY = CH - PAD.bottom
 
-      if (!isCrashed) {
+      if (!isCrashing && !isCrashed) {
         drawAxes(ctx, CW, CH)
         drawDots(ctx, CW, CH, time)
       }
@@ -558,9 +560,6 @@ export function GameCanvas({
       }
 
       // ── CRASHING / CRASHED ───────────────────────────────────────────
-      if (isCrashing && trailPoints.length >= 2) {
-        drawTrail(ctx, CW, CH, trailPoints, true)
-      }
       if (isCrashing && !plane.offScreen) {
         const tailX    = PAD.left + (plane.nx + plane.crashOffsetX) * dw
         const tailY    = PAD.top  + (1 - (plane.ny + plane.crashOffsetY)) * dh

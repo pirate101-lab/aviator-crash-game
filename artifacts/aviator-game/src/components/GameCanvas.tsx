@@ -33,15 +33,17 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, tim
   const ox       = PAD.left
   const oy       = h - PAD.bottom
   const maxDist  = Math.sqrt(w * w + h * h) * 1.5
-  const numRays  = 28
-  const fanStart = -Math.PI
-  const fanEnd   = -Math.PI * 0.02
-  const fanSpan  = fanEnd - fanStart
+  const numRays  = 36
   const rotOff   = (time * 0.00008) % (Math.PI * 2)
 
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(ox, 0, w - ox, oy)
+  ctx.clip()
+
   for (let i = 0; i < numRays; i++) {
-    const a1 = fanStart + (i / numRays) * fanSpan + rotOff
-    const a2 = fanStart + ((i + 0.45) / numRays) * fanSpan + rotOff
+    const a1 = (i / numRays) * Math.PI * 2 + rotOff
+    const a2 = ((i + 0.45) / numRays) * Math.PI * 2 + rotOff
     ctx.beginPath()
     ctx.moveTo(ox, oy)
     ctx.lineTo(ox + Math.cos(a1) * maxDist, oy + Math.sin(a1) * maxDist)
@@ -50,6 +52,8 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, tim
     ctx.fillStyle = 'rgba(255,255,255,0.018)'
     ctx.fill()
   }
+
+  ctx.restore()
 
   const glow = ctx.createRadialGradient(ox, oy, 0, ox, oy, Math.min(w, h) * 0.7)
   glow.addColorStop(0,    'rgba(160,110,30,0.28)')
@@ -120,8 +124,8 @@ function drawTrail(
   const ox  = PAD.left
   const oy  = h - PAD.bottom
 
-  const raw = points[0].x > 0.001 || points[0].y > 0.001
-    ? [{ x: 0, y: 0 }, ...points]
+  const raw = points[0].x > 0.001 || points[0].y > 0.015
+    ? [{ x: 0, y: 0.012 }, ...points]
     : points
   const pts = raw.map((p) => toPx(p, w, h))
 
@@ -530,13 +534,11 @@ export function GameCanvas({
       const originX = PAD.left
       const originY = CH - PAD.bottom
 
-      if (!isCrashing && !isCrashed) {
-        drawAxes(ctx, CW, CH)
-        drawDots(ctx, CW, CH, time)
-      }
+      drawAxes(ctx, CW, CH)
+      drawDots(ctx, CW, CH, time)
 
       if (isWaiting) {
-        const WAIT_ANGLE = 0.52
+        const WAIT_ANGLE = 0.433
         const PLANE_LEN  = 94
         const noseX  = originX + PLANE_LEN * Math.cos(WAIT_ANGLE)
         const noseY  = originY - PLANE_LEN * Math.sin(WAIT_ANGLE)
@@ -557,7 +559,10 @@ export function GameCanvas({
         drawPlane(ctx, noseX, noseY, angleRad, false)
       }
 
-      // ── CRASHING / CRASHED ───────────────────────────────────────────
+      if ((isCrashing || isCrashed) && trailPoints.length >= 2) {
+        drawTrail(ctx, CW, CH, trailPoints, true)
+      }
+
       if (isCrashing && !plane.offScreen) {
         const tailX    = PAD.left + (plane.nx + plane.crashOffsetX) * dw
         const tailY    = PAD.top  + (1 - (plane.ny + plane.crashOffsetY)) * dh

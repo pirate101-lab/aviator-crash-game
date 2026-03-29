@@ -57,7 +57,8 @@ function mapX(t: number): number {
 
 function mapY(_mult: number, _cp: number, t: number): number {
   const p = mapProgress(t)
-  return MAX_Y * Math.pow(p, 2.2)
+  const lift = 0.04 * (1 - Math.exp(-8 * t))
+  return MAX_Y * Math.pow(p, 1.5) + lift
 }
 
 function tiltDeg(ny: number): number {
@@ -187,9 +188,9 @@ export function useGameState(): GameState {
     stop()
     phaseRef.current = 'flying'
     lastPtMs.current = 0
-    trailBuf.current = [{ x: 0, y: 0 }]
+    trailBuf.current = [{ x: 0, y: 0.012 }]
     setPhase('flying'); setMultiplier(1)
-    setTrail([{ x: 0, y: 0 }]); setPlane({ ...DEFAULT_PLANE })
+    setTrail([{ x: 0, y: 0.012 }]); setPlane({ ...DEFAULT_PLANE })
     tStart.current = performance.now()
 
     const tick = (now: number) => {

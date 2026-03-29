@@ -46,6 +46,9 @@ export default function AviatorGame() {
               plane={game.plane}
               betMode={betMode}
               onToggleBetMode={toggleBetMode}
+              serverSeedHash={game.serverSeedHash}
+              nonce={game.nonce}
+              revealedSeed={game.revealedSeed}
             />
           </div>
 

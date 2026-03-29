@@ -24,6 +24,9 @@ export interface GameState {
   roundHistory: number[]
   trailPoints: CurvePoint[]
   plane: PlaneTransform
+  serverSeedHash: string
+  nonce: number
+  revealedSeed: string
 }
 
 const WAIT_MS           = 5000
@@ -62,11 +65,45 @@ function tiltDeg(ny: number): number {
   return 12 + Math.pow(ratio, 0.8) * 33
 }
 
-function generateCrashPoint(): number {
-  const r = Math.random()
-  const raw = 1 / (1 - r) * 0.97
-  return Math.min(200, Math.max(1.02, raw))
+// ── Provably Fair Algorithm (HMAC-SHA256, Web Crypto API) ─────────────────
+
+function randomHex(bytes: number): string {
+  const arr = new Uint8Array(bytes)
+  crypto.getRandomValues(arr)
+  return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('')
 }
+
+async function sha256Hex(message: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(message))
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function hmacSHA256Hex(secret: string, message: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  )
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message))
+  return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+// E = 2^52 (max value of a 13-char hex string)
+const E = 2 ** 52
+
+async function computeCrashPoint(serverSeed: string, clientSeed: string, nonce: number): Promise<number> {
+  const hash = await hmacSHA256Hex(serverSeed, `${clientSeed}:${nonce}`)
+  const h    = parseInt(hash.slice(0, 13), 16)
+  // 1% house edge: force crash at 1.00x if h < E/100
+  if (h < E / 100) return 1.00
+  const raw  = Math.floor((100 * E - h) / (E - h)) / 100
+  return Math.min(200, Math.max(1.01, raw))
+}
+
+// ── Shared client seed (fixed for this browser session) ──────────────────
+const SESSION_CLIENT_SEED = randomHex(16)
 
 const INITIAL_HISTORY = [1.89, 25.04, 1.33, 1.27, 4.40, 2.36, 15.64]
 
@@ -84,14 +121,21 @@ export function useGameState(): GameState {
   const [trailPoints, setTrail]     = useState<CurvePoint[]>([])
   const [plane, setPlane]           = useState<PlaneTransform>(DEFAULT_PLANE)
 
-  const raf        = useRef(0)
-  const timeout    = useRef(0)
-  const tStart     = useRef(0)
-  const cpRef      = useRef(0)
-  const phaseRef   = useRef<Phase>('waiting')
-  const lastPtMs   = useRef(0)
-  const trailBuf   = useRef<CurvePoint[]>([])
-  const planeRef   = useRef<PlaneTransform>(DEFAULT_PLANE)
+  // Provably fair state
+  const [serverSeedHash, setSeedHash]   = useState<string>('')
+  const [nonce, setNonce]               = useState<number>(1)
+  const [revealedSeed, setRevealedSeed] = useState<string>('')
+
+  const raf          = useRef(0)
+  const timeout      = useRef(0)
+  const tStart       = useRef(0)
+  const cpRef        = useRef(0)
+  const phaseRef     = useRef<Phase>('waiting')
+  const lastPtMs     = useRef(0)
+  const trailBuf     = useRef<CurvePoint[]>([])
+  const planeRef     = useRef<PlaneTransform>(DEFAULT_PLANE)
+  const nonceRef     = useRef(1)
+  const serverSeedRef = useRef<string>('')
 
   const stop = useCallback(() => {
     if (raf.current) { cancelAnimationFrame(raf.current); raf.current = 0 }
@@ -101,9 +145,30 @@ export function useGameState(): GameState {
     stop()
     if (timeout.current) { clearTimeout(timeout.current); timeout.current = 0 }
     phaseRef.current = 'waiting'
+
+    // Increment nonce each round
+    nonceRef.current += 1
+    setNonce(nonceRef.current)
+
+    // Generate new server seed + hash, compute crash point for this round
+    const serverSeed = randomHex(32)
+    serverSeedRef.current = serverSeed
+
+    // Reset visual state immediately while async work runs
     setPhase('waiting'); setMultiplier(1); setCrashPoint(0); setWaitProg(0)
-    setTrail([]); setPlane(DEFAULT_PLANE)
+    setTrail([]); setPlane(DEFAULT_PLANE); setRevealedSeed('')
     trailBuf.current = []
+
+    // Async: hash server seed for display + compute crash point
+    const roundNonce = nonceRef.current
+    sha256Hex(serverSeed).then(hash => {
+      setSeedHash(hash)
+      return computeCrashPoint(serverSeed, SESSION_CLIENT_SEED, roundNonce)
+    }).then(cp => {
+      cpRef.current = cp
+      setCrashPoint(cp)
+    })
+
     tStart.current = performance.now()
 
     const tick = (now: number) => {
@@ -111,8 +176,6 @@ export function useGameState(): GameState {
       const el = now - tStart.current
       setWaitProg(Math.min(100, (el / WAIT_MS) * 100))
       if (el >= WAIT_MS) {
-        const cp = generateCrashPoint()
-        cpRef.current = cp; setCrashPoint(cp)
         startFly(); return
       }
       raf.current = requestAnimationFrame(tick)
@@ -165,6 +228,9 @@ export function useGameState(): GameState {
     phaseRef.current = 'crashing'
     setPhase('crashing')
 
+    // Reveal the server seed so players can verify
+    setRevealedSeed(serverSeedRef.current)
+
     const t0 = performance.now()
     const snapNx = planeRef.current.nx
     const snapNy = planeRef.current.ny
@@ -204,5 +270,8 @@ export function useGameState(): GameState {
     return () => { stop(); if (timeout.current) clearTimeout(timeout.current) }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { phase, multiplier, crashPoint, waitProgress, roundHistory, trailPoints, plane }
+  return {
+    phase, multiplier, crashPoint, waitProgress, roundHistory, trailPoints, plane,
+    serverSeedHash, nonce, revealedSeed,
+  }
 }

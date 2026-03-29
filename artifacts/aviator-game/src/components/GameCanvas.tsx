@@ -11,6 +11,9 @@ interface GameCanvasProps {
   plane: PlaneTransform
   betMode: 'money' | 'freebet'
   onToggleBetMode: () => void
+  serverSeedHash: string
+  nonce: number
+  revealedSeed: string
 }
 
 const PAD = { left: 44, right: 16, top: 20, bottom: 36 }
@@ -482,6 +485,9 @@ export function GameCanvas({
   plane,
   betMode,
   onToggleBetMode,
+  serverSeedHash,
+  nonce,
+  revealedSeed,
 }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rafRef    = useRef(0)
@@ -525,9 +531,13 @@ export function GameCanvas({
 
       drawAxes(ctx, CW, CH)
 
-      // ── WAITING: plane parked exactly at graph origin, horizontal ────
+      // ── WAITING: plane rests with tail at origin, nose tilted upper-right ──
       if (isWaiting) {
-        drawPlane(ctx, originX, originY, 0, false)
+        const WAIT_ANGLE = 0.26          // ~15° upward tilt in radians
+        const PLANE_LEN  = 94            // nose-to-tail length in local px
+        const noseX = originX + PLANE_LEN * Math.cos(WAIT_ANGLE)
+        const noseY = originY - PLANE_LEN * Math.sin(WAIT_ANGLE)
+        drawPlane(ctx, noseX, noseY, WAIT_ANGLE, false)
       }
 
       // ── FLYING: trail + animated plane ──────────────────────────────
@@ -597,6 +607,21 @@ export function GameCanvas({
               />
             </div>
           </div>
+          {/* Provably fair: server seed hash + nonce */}
+          {serverSeedHash && (
+            <div className="text-center px-3 py-1.5 rounded-lg" style={{ background: 'rgba(0,0,0,0.45)' }}>
+              <div className="text-[10px] text-white/40 uppercase tracking-widest mb-0.5">
+                Round #{nonce} · Provably Fair
+              </div>
+              <div
+                className="text-[9px] font-mono text-[#00E676]/70 break-all"
+                style={{ maxWidth: '320px', lineHeight: 1.5 }}
+                title="SHA-256 hash of this round's server seed — verify after the round"
+              >
+                {serverSeedHash}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -631,6 +656,17 @@ export function GameCanvas({
             >
               {crashPoint > 0 ? `${crashPoint.toFixed(2)}x` : `${multiplier.toFixed(2)}x`}
             </div>
+            {/* Provably fair: reveal server seed for verification */}
+            {revealedSeed && (
+              <div className="mt-3 border-t border-[#E91E63]/20 pt-2">
+                <div className="text-[9px] text-[#E91E63]/50 uppercase tracking-widest mb-0.5">
+                  Server Seed (verify)
+                </div>
+                <div className="text-[8px] font-mono text-[#E91E63]/60 break-all" style={{ maxWidth: '260px' }}>
+                  {revealedSeed}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

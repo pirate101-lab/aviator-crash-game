@@ -134,10 +134,12 @@ function drawTrail(
   const finalMult = computeMultiplier(elMs)
   const finalNy = mapY(finalMult)
   const finalNx = mapX(elMs)
-  const lastPx = { cx: ox + finalNx * dw, cy: PAD.top + (1 - finalNy) * dh }
-  const lastGen = pxPts[pxPts.length - 1]
-  if (Math.abs(lastPx.cx - lastGen.cx) > 0.5 || Math.abs(lastPx.cy - lastGen.cy) > 0.5) {
-    pxPts.push(lastPx)
+  const finalPx = { cx: ox + finalNx * dw, cy: PAD.top + (1 - finalNy) * dh }
+  const last = pxPts[pxPts.length - 1]
+  if (Math.abs(finalPx.cx - last.cx) < 1) {
+    last.cy = Math.min(last.cy, finalPx.cy)
+  } else if (Math.abs(finalPx.cx - last.cx) > 0.5 || Math.abs(finalPx.cy - last.cy) > 0.5) {
+    pxPts.push(finalPx)
   }
 
   if (pxPts.length < 2) return

@@ -167,7 +167,7 @@ export function useGameState() {
 
     setHistory(prev => [
       { multiplier: finalMultiplier, timestamp: Date.now() },
-      ...prev.slice(0, 19),
+      ...prev.slice(0, 14),
     ]);
 
     setTimeout(() => {

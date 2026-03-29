@@ -61,9 +61,12 @@ function mapY(_mult: number, _cp: number, t: number): number {
   return MAX_Y * Math.pow(p, 1.5) + lift
 }
 
-function tiltDeg(ny: number): number {
-  const ratio = ny / MAX_Y
-  return 12 + Math.pow(ratio, 0.8) * 33
+function tiltDeg(ny: number, elapsedMs: number): number {
+  const ratio = Math.min(1, ny / MAX_Y)
+  const base = 28 * Math.pow(1 - ratio, 1.0) + 2
+  const oscStrength = ratio > 0.6 ? (ratio - 0.6) / 0.4 * 1.8 : 0
+  const osc = oscStrength * Math.sin(elapsedMs * 0.002)
+  return base + osc
 }
 
 // ── Provably Fair Algorithm (HMAC-SHA256, Web Crypto API) ─────────────────
@@ -207,7 +210,7 @@ export function useGameState(): GameState {
       const t       = el / totalMs
       const nx      = mapX(t)
       const ny      = mapY(mult, cp, t)
-      const angle   = tiltDeg(ny)
+      const angle   = tiltDeg(ny, el)
 
       if (el - lastPtMs.current >= POINT_INTERVAL_MS) {
         lastPtMs.current = el
@@ -216,7 +219,12 @@ export function useGameState(): GameState {
         setTrail([...trailBuf.current])
       }
 
-      const newPlane = { nx, ny, angleDeg: angle, crashOffsetX: 0, crashOffsetY: 0, offScreen: false }
+      const ratio = Math.min(1, ny / MAX_Y)
+      const bobStrength = ratio > 0.6 ? (ratio - 0.6) / 0.4 * 0.012 : 0
+      const bob = bobStrength * Math.sin(el * 0.0015)
+      const planeNy = ny + bob
+
+      const newPlane = { nx, ny: planeNy, angleDeg: angle, crashOffsetX: 0, crashOffsetY: 0, offScreen: false }
       planeRef.current = newPlane
       setPlane(newPlane)
       raf.current = requestAnimationFrame(tick)

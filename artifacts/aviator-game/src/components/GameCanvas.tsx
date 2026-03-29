@@ -161,9 +161,7 @@ function drawTrail(
   ctx.lineTo(pts[0].cx, oy)
   ctx.closePath()
 
-  if (crashed) {
-    ctx.fillStyle = 'rgba(80,80,80,0.12)'
-  } else {
+  if (!crashed) {
     const g = ctx.createLinearGradient(0, pts[pts.length - 1].cy, 0, oy)
     g.addColorStop(0,    'rgba(0,230,118,0.9)')
     g.addColorStop(0.25, 'rgba(0,210,100,0.75)')
@@ -171,8 +169,8 @@ function drawTrail(
     g.addColorStop(0.75, 'rgba(0,140,60,0.3)')
     g.addColorStop(1,    'rgba(0,80,40,0.05)')
     ctx.fillStyle = g
+    ctx.fill()
   }
-  ctx.fill()
 
   if (crashed) {
     ctx.strokeStyle = 'rgba(100,100,100,0.5)'

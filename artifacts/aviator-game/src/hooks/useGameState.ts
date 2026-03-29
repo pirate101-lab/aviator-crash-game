@@ -1,272 +1,208 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import {
-  GamePhase,
-  Bet,
-  PlayerBet,
-  HistoryEntry,
-  generateCrashPoint,
-  generateSimulatedPlayers,
-  computeMultiplier,
-} from "@/lib/gameEngine";
+import { useState, useRef, useEffect, useCallback } from 'react'
 
-const WAITING_DURATION = 5000;
-const INITIAL_BALANCE = 10000;
+export type Phase = 'waiting' | 'flying' | 'crashing' | 'crashed'
 
-export function useGameState() {
-  const [phase, setPhase] = useState<GamePhase>("waiting");
-  const [multiplier, setMultiplier] = useState(1.0);
-  const [crashPoint, setCrashPoint] = useState(2.0);
-  const [countdown, setCountdown] = useState(5);
-  const [balance, setBalance] = useState(INITIAL_BALANCE);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [playerBets, setPlayerBets] = useState<PlayerBet[]>([]);
-  const [myBets, setMyBets] = useState<HistoryEntry[]>([]);
+export interface CurvePoint {
+  x: number
+  y: number
+}
 
-  const [bet1Amount, setBet1Amount] = useState<string>("200");
-  const [bet2Amount, setBet2Amount] = useState<string>("200");
-  const [bet1Active, setBet1Active] = useState(false);
-  const [bet2Active, setBet2Active] = useState(false);
-  const [bet1AutoCashOut, setBet1AutoCashOut] = useState<string>("");
-  const [bet2AutoCashOut, setBet2AutoCashOut] = useState<string>("");
-  const [bet1AutoEnabled, setBet1AutoEnabled] = useState(false);
-  const [bet2AutoEnabled, setBet2AutoEnabled] = useState(false);
-  const [bet1CashedOut, setBet1CashedOut] = useState<{ at: number; profit: number } | null>(null);
-  const [bet2CashedOut, setBet2CashedOut] = useState<{ at: number; profit: number } | null>(null);
+export interface PlaneTransform {
+  nx: number
+  ny: number
+  angleDeg: number
+  crashOffsetX: number
+  crashOffsetY: number
+  offScreen: boolean
+}
 
-  const phaseRef = useRef<GamePhase>("waiting");
-  const startTimeRef = useRef<number>(0);
-  const crashPointRef = useRef<number>(2.0);
-  const animFrameRef = useRef<number>(0);
-  const bet1ActiveRef = useRef(false);
-  const bet2ActiveRef = useRef(false);
-  const bet1AmountRef = useRef("200");
-  const bet2AmountRef = useRef("200");
-  const bet1AutoRef = useRef("");
-  const bet2AutoRef = useRef("");
-  const bet1AutoEnabledRef = useRef(false);
-  const bet2AutoEnabledRef = useRef(false);
-  const balanceRef = useRef(INITIAL_BALANCE);
-  const bet1CashedRef = useRef(false);
-  const bet2CashedRef = useRef(false);
+export interface GameState {
+  phase: Phase
+  multiplier: number
+  crashPoint: number
+  waitProgress: number
+  roundHistory: number[]
+  trailPoints: CurvePoint[]
+  plane: PlaneTransform
+}
 
-  useEffect(() => { bet1ActiveRef.current = bet1Active; }, [bet1Active]);
-  useEffect(() => { bet2ActiveRef.current = bet2Active; }, [bet2Active]);
-  useEffect(() => { bet1AmountRef.current = bet1Amount; }, [bet1Amount]);
-  useEffect(() => { bet2AmountRef.current = bet2Amount; }, [bet2Amount]);
-  useEffect(() => { bet1AutoRef.current = bet1AutoCashOut; }, [bet1AutoCashOut]);
-  useEffect(() => { bet2AutoRef.current = bet2AutoCashOut; }, [bet2AutoCashOut]);
-  useEffect(() => { bet1AutoEnabledRef.current = bet1AutoEnabled; }, [bet1AutoEnabled]);
-  useEffect(() => { bet2AutoEnabledRef.current = bet2AutoEnabled; }, [bet2AutoEnabled]);
-  useEffect(() => { balanceRef.current = balance; }, [balance]);
+const WAIT_MS           = 5000
+const CRASH_DISPLAY_MS  = 3000
+const FLY_AWAY_MS       = 700
+const MAX_HISTORY       = 20
+const POINT_INTERVAL_MS = 60
 
-  const startWaiting = useCallback((newCrashPoint: number) => {
-    phaseRef.current = "waiting";
-    setPhase("waiting");
-    crashPointRef.current = newCrashPoint;
-    setCrashPoint(newCrashPoint);
-    setMultiplier(1.0);
-    bet1CashedRef.current = false;
-    bet2CashedRef.current = false;
-    setBet1CashedOut(null);
-    setBet2CashedOut(null);
+function computeMultiplier(ms: number): number {
+  return Math.pow(Math.E, 0.00006 * ms)
+}
 
-    const players = generateSimulatedPlayers(Math.floor(Math.random() * 30) + 20);
-    setPlayerBets(players);
+function estimateCrashMs(cp: number): number {
+  if (cp <= 1) return 1
+  return Math.log(cp) / 0.00006
+}
 
-    let remaining = WAITING_DURATION;
-    const interval = setInterval(() => {
-      remaining -= 1000;
-      setCountdown(Math.max(0, Math.ceil(remaining / 1000)));
-      if (remaining <= 0) {
-        clearInterval(interval);
-        startFlying();
+const MAX_X = 0.92
+const MAX_Y = 0.85
+
+function mapProgress(t: number): number {
+  return 1 - Math.exp(-2.2 * t)
+}
+
+function mapX(t: number): number {
+  return MAX_X * mapProgress(t)
+}
+
+function mapY(_mult: number, _cp: number, t: number): number {
+  const p = mapProgress(t)
+  return MAX_Y * Math.pow(p, 2.2)
+}
+
+function tiltDeg(ny: number): number {
+  const ratio = ny / MAX_Y
+  return 12 + Math.pow(ratio, 0.8) * 33
+}
+
+function generateCrashPoint(): number {
+  const r = Math.random()
+  const raw = 1 / (1 - r) * 0.97
+  return Math.min(200, Math.max(1.02, raw))
+}
+
+const INITIAL_HISTORY = [1.89, 25.04, 1.33, 1.27, 4.40, 2.36, 15.64]
+
+const DEFAULT_PLANE: PlaneTransform = {
+  nx: 0, ny: 0, angleDeg: 0,
+  crashOffsetX: 0, crashOffsetY: 0, offScreen: false,
+}
+
+export function useGameState(): GameState {
+  const [phase, setPhase]           = useState<Phase>('waiting')
+  const [multiplier, setMultiplier] = useState(1.0)
+  const [crashPoint, setCrashPoint] = useState(0)
+  const [waitProgress, setWaitProg] = useState(0)
+  const [roundHistory, setHistory]  = useState<number[]>(INITIAL_HISTORY)
+  const [trailPoints, setTrail]     = useState<CurvePoint[]>([])
+  const [plane, setPlane]           = useState<PlaneTransform>(DEFAULT_PLANE)
+
+  const raf        = useRef(0)
+  const timeout    = useRef(0)
+  const tStart     = useRef(0)
+  const cpRef      = useRef(0)
+  const phaseRef   = useRef<Phase>('waiting')
+  const lastPtMs   = useRef(0)
+  const trailBuf   = useRef<CurvePoint[]>([])
+  const planeRef   = useRef<PlaneTransform>(DEFAULT_PLANE)
+
+  const stop = useCallback(() => {
+    if (raf.current) { cancelAnimationFrame(raf.current); raf.current = 0 }
+  }, [])
+
+  const startWait = useCallback(() => {
+    stop()
+    if (timeout.current) { clearTimeout(timeout.current); timeout.current = 0 }
+    phaseRef.current = 'waiting'
+    setPhase('waiting'); setMultiplier(1); setCrashPoint(0); setWaitProg(0)
+    setTrail([]); setPlane(DEFAULT_PLANE)
+    trailBuf.current = []
+    tStart.current = performance.now()
+
+    const tick = (now: number) => {
+      if (phaseRef.current !== 'waiting') return
+      const el = now - tStart.current
+      setWaitProg(Math.min(100, (el / WAIT_MS) * 100))
+      if (el >= WAIT_MS) {
+        const cp = generateCrashPoint()
+        cpRef.current = cp; setCrashPoint(cp)
+        startFly(); return
       }
-    }, 1000);
-    setCountdown(Math.ceil(WAITING_DURATION / 1000));
-  }, []);
-
-  const startFlying = useCallback(() => {
-    phaseRef.current = "flying";
-    setPhase("flying");
-    startTimeRef.current = performance.now();
-
-    const flyLoop = (now: number) => {
-      if (phaseRef.current !== "flying") return;
-      const elapsed = now - startTimeRef.current;
-      const m = computeMultiplier(elapsed);
-      setMultiplier(m);
-
-      if (m >= crashPointRef.current) {
-        handleCrash(m);
-        return;
-      }
-
-      if (bet1ActiveRef.current && !bet1CashedRef.current && bet1AutoEnabledRef.current) {
-        const target = parseFloat(bet1AutoRef.current);
-        if (!isNaN(target) && m >= target) {
-          performCashOut(1, m);
-        }
-      }
-      if (bet2ActiveRef.current && !bet2CashedRef.current && bet2AutoEnabledRef.current) {
-        const target = parseFloat(bet2AutoRef.current);
-        if (!isNaN(target) && m >= target) {
-          performCashOut(2, m);
-        }
-      }
-
-      setPlayerBets(prev => {
-        const updated = prev.map(p => {
-          if (p.cashedOut) return p;
-          const cashChance = 0.003 * Math.sqrt(m);
-          if (Math.random() < cashChance) {
-            return { ...p, cashedOut: true, cashedOutAt: m };
-          }
-          return p;
-        });
-        return updated;
-      });
-
-      animFrameRef.current = requestAnimationFrame(flyLoop);
-    };
-
-    animFrameRef.current = requestAnimationFrame(flyLoop);
-  }, []);
-
-  const performCashOut = useCallback((betNum: 1 | 2, at: number) => {
-    if (betNum === 1) {
-      if (bet1CashedRef.current) return;
-      bet1CashedRef.current = true;
-      const amt = parseFloat(bet1AmountRef.current) || 0;
-      const profit = parseFloat((amt * at - amt).toFixed(2));
-      const newBal = parseFloat((balanceRef.current + amt * at).toFixed(2));
-      balanceRef.current = newBal;
-      setBalance(newBal);
-      setBet1CashedOut({ at, profit });
-    } else {
-      if (bet2CashedRef.current) return;
-      bet2CashedRef.current = true;
-      const amt = parseFloat(bet2AmountRef.current) || 0;
-      const profit = parseFloat((amt * at - amt).toFixed(2));
-      const newBal = parseFloat((balanceRef.current + amt * at).toFixed(2));
-      balanceRef.current = newBal;
-      setBalance(newBal);
-      setBet2CashedOut({ at, profit });
+      raf.current = requestAnimationFrame(tick)
     }
-  }, []);
+    raf.current = requestAnimationFrame(tick)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleCrash = useCallback((finalMultiplier: number) => {
-    cancelAnimationFrame(animFrameRef.current);
-    phaseRef.current = "crashed";
-    setPhase("crashed");
-    setMultiplier(finalMultiplier);
+  const startFly = useCallback(() => {
+    stop()
+    phaseRef.current = 'flying'
+    lastPtMs.current = 0
+    trailBuf.current = [{ x: 0, y: 0 }]
+    setPhase('flying'); setMultiplier(1)
+    setTrail([{ x: 0, y: 0 }]); setPlane({ ...DEFAULT_PLANE })
+    tStart.current = performance.now()
 
-    setPlayerBets(prev => prev.map(p => ({
-      ...p,
-      cashedOut: p.cashedOut ? p.cashedOut : false,
-    })));
+    const tick = (now: number) => {
+      if (phaseRef.current !== 'flying') return
+      const el   = now - tStart.current
+      const mult = computeMultiplier(el)
+      const cp   = cpRef.current
 
-    setHistory(prev => [
-      { multiplier: finalMultiplier, timestamp: Date.now() },
-      ...prev.slice(0, 14),
-    ]);
+      if (mult >= cp) { setMultiplier(cp); startCrash(); return }
 
-    setTimeout(() => {
-      const next = generateCrashPoint();
-      startWaiting(next);
-    }, 3000);
-  }, [startWaiting]);
+      setMultiplier(mult)
+
+      const totalMs = estimateCrashMs(cp)
+      const t       = el / totalMs
+      const nx      = mapX(t)
+      const ny      = mapY(mult, cp, t)
+      const angle   = tiltDeg(ny)
+
+      if (el - lastPtMs.current >= POINT_INTERVAL_MS) {
+        lastPtMs.current = el
+        const pt: CurvePoint = { x: nx, y: ny }
+        trailBuf.current = [...trailBuf.current.slice(-399), pt]
+        setTrail([...trailBuf.current])
+      }
+
+      const newPlane = { nx, ny, angleDeg: angle, crashOffsetX: 0, crashOffsetY: 0, offScreen: false }
+      planeRef.current = newPlane
+      setPlane(newPlane)
+      raf.current = requestAnimationFrame(tick)
+    }
+    raf.current = requestAnimationFrame(tick)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const startCrash = useCallback(() => {
+    stop()
+    phaseRef.current = 'crashing'
+    setPhase('crashing')
+
+    const t0 = performance.now()
+    const snapNx = planeRef.current.nx
+    const snapNy = planeRef.current.ny
+
+    const tick = (now: number) => {
+      if (phaseRef.current !== 'crashing') return
+      const s = (now - t0) / 1000
+      const accel = 1 + s * 5
+      const offX  = 1.8 * s * accel
+      const offY  = -3.0 * s * accel
+      const gone  = (snapNx + offX > 1.5) || (snapNy + offY < -0.5)
+
+      setPlane({
+        nx: snapNx, ny: snapNy,
+        angleDeg: 42 + s * 40,
+        crashOffsetX: offX, crashOffsetY: offY,
+        offScreen: gone,
+      })
+
+      if (s >= FLY_AWAY_MS / 1000) {
+        phaseRef.current = 'crashed'
+        setPhase('crashed')
+        const cv = cpRef.current
+        timeout.current = window.setTimeout(() => {
+          setHistory(prev => [...prev, cv].slice(-MAX_HISTORY))
+          startWait()
+        }, CRASH_DISPLAY_MS)
+        return
+      }
+      raf.current = requestAnimationFrame(tick)
+    }
+    raf.current = requestAnimationFrame(tick)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const first = generateCrashPoint();
-    startWaiting(first);
-    return () => {
-      cancelAnimationFrame(animFrameRef.current);
-    };
-  }, []);
+    startWait()
+    return () => { stop(); if (timeout.current) clearTimeout(timeout.current) }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const placeBet = useCallback((betNum: 1 | 2) => {
-    if (phase !== "waiting") return;
-    const amtStr = betNum === 1 ? bet1Amount : bet2Amount;
-    const amt = parseFloat(amtStr);
-    if (isNaN(amt) || amt <= 0 || amt > balance) return;
-
-    const newBal = parseFloat((balanceRef.current - amt).toFixed(2));
-    balanceRef.current = newBal;
-    setBalance(newBal);
-
-    if (betNum === 1) {
-      setBet1Active(true);
-      bet1ActiveRef.current = true;
-    } else {
-      setBet2Active(true);
-      bet2ActiveRef.current = true;
-    }
-  }, [phase, bet1Amount, bet2Amount, balance]);
-
-  const cancelBet = useCallback((betNum: 1 | 2) => {
-    if (phase !== "waiting") return;
-    const amtStr = betNum === 1 ? bet1Amount : bet2Amount;
-    const amt = parseFloat(amtStr);
-
-    const newBal = parseFloat((balanceRef.current + (isNaN(amt) ? 0 : amt)).toFixed(2));
-    balanceRef.current = newBal;
-    setBalance(newBal);
-
-    if (betNum === 1) {
-      setBet1Active(false);
-      bet1ActiveRef.current = false;
-    } else {
-      setBet2Active(false);
-      bet2ActiveRef.current = false;
-    }
-  }, [phase, bet1Amount, bet2Amount]);
-
-  const cashOut = useCallback((betNum: 1 | 2) => {
-    if (phase !== "flying") return;
-    performCashOut(betNum, multiplier);
-  }, [phase, multiplier, performCashOut]);
-
-  useEffect(() => {
-    if (phase === "crashed") {
-      if (bet1Active && !bet1CashedRef.current) {
-        setBet1Active(false);
-        bet1ActiveRef.current = false;
-      }
-      if (bet2Active && !bet2CashedRef.current) {
-        setBet2Active(false);
-        bet2ActiveRef.current = false;
-      }
-    }
-    if (phase === "waiting") {
-      setBet1Active(false);
-      setBet2Active(false);
-      bet1ActiveRef.current = false;
-      bet2ActiveRef.current = false;
-    }
-  }, [phase]);
-
-  return {
-    phase,
-    multiplier,
-    crashPoint,
-    countdown,
-    balance,
-    history,
-    playerBets,
-
-    bet1Amount, setBet1Amount,
-    bet2Amount, setBet2Amount,
-    bet1Active,
-    bet2Active,
-    bet1AutoCashOut, setBet1AutoCashOut,
-    bet2AutoCashOut, setBet2AutoCashOut,
-    bet1AutoEnabled, setBet1AutoEnabled,
-    bet2AutoEnabled, setBet2AutoEnabled,
-    bet1CashedOut,
-    bet2CashedOut,
-
-    placeBet,
-    cancelBet,
-    cashOut,
-  };
+  return { phase, multiplier, crashPoint, waitProgress, roundHistory, trailPoints, plane }
 }

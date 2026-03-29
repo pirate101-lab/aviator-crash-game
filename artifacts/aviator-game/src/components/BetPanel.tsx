@@ -1,191 +1,250 @@
-import { GamePhase } from "@/lib/gameEngine";
+import { useState } from 'react'
 
 interface BetPanelProps {
-  betNum: 1 | 2;
-  phase: GamePhase;
-  amount: string;
-  setAmount: (v: string) => void;
-  isActive: boolean;
-  autoCashOut: string;
-  setAutoCashOut: (v: string) => void;
-  autoEnabled: boolean;
-  setAutoEnabled: (v: boolean) => void;
-  cashedOut: { at: number; profit: number } | null;
-  balance: number;
-  multiplier: number;
-  onPlace: () => void;
-  onCancel: () => void;
-  onCashOut: () => void;
+  defaultAmount?: number
+  currency?: string
+  showLiveBets?: boolean
 }
 
-const QUICK_AMOUNTS = [200, 500, 1000, 2000];
+const QUICK_AMOUNTS = [10, 100, 1000, 10000] as const
+const STEP = 10
+const MIN_AMOUNT = 0
 
-export function BetPanel({
-  betNum, phase, amount, setAmount, isActive,
-  autoCashOut, setAutoCashOut, autoEnabled, setAutoEnabled,
-  cashedOut, balance, multiplier,
-  onPlace, onCancel, onCashOut
+type Tab = 'bet' | 'auto'
+type LiveTab = 'live' | 'mine'
+
+const MOCK_LIVE_BETS = [
+  { id: 1, user: '2**2', bet: 3680.00, cashout: 12.56, won: 46222.78, high: true },
+  { id: 2, user: '2**4', bet: 3620.00, cashout: 1.45, won: 5248.77, high: false },
+  { id: 3, user: '2**9', bet: 3590.00, cashout: 1.31, won: 4702.77, high: false },
+  { id: 4, user: '2**0', bet: 3580.00, cashout: 1.70, won: 6085.71, high: false },
+  { id: 5, user: '2**8', bet: 3570.00, cashout: 1.10, won: 3926.88, high: false },
+  { id: 6, user: '2**9', bet: 3300.00, cashout: 1.63, won: 5379.00, high: false },
+  { id: 7, user: '2**7', bet: 3270.00, cashout: 1.37, won: 4479.67, high: false },
+  { id: 8, user: '2**3', bet: 3140.00, cashout: 10.24, won: 32152.26, high: true },
+  { id: 9, user: '2**8', bet: 2310.00, cashout: 1.37, won: 3164.35, high: false },
+  { id: 10, user: '2**5', bet: 1990.00, cashout: 1.36, won: 2706.28, high: false },
+  { id: 11, user: '2**8', bet: 1420.00, cashout: 5.45, won: 7738.88, high: true },
+  { id: 12, user: '2**6', bet: 1390.00, cashout: 1.38, won: 1918.31, high: false },
+]
+
+function getCashoutColor(v: number): string {
+  if (v >= 10) return '#E91E63'
+  if (v >= 2) return '#FF9800'
+  return '#cdd2db'
+}
+
+function TabButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex-1 rounded-full py-1.5 text-xs font-semibold transition-all duration-200 ${
+        active
+          ? 'bg-[#00E676] text-[#0d0d1a]'
+          : 'text-muted-foreground hover:text-foreground/70'
+      }`}
+    >
+      {label}
+    </button>
+  )
+}
+
+export default function BetPanel({
+  defaultAmount = 10,
+  currency = 'KSH',
+  showLiveBets = false,
 }: BetPanelProps) {
-  const numAmount = parseFloat(amount) || 0;
-  const canPlace = phase === "waiting" && !isActive && numAmount > 0 && numAmount <= balance;
-  const canCancel = phase === "waiting" && isActive;
-  const canCashOut = phase === "flying" && isActive && !cashedOut;
+  const [amount, setAmount] = useState(defaultAmount)
+  const [activeTab, setActiveTab] = useState<Tab>('bet')
+  const [liveTab, setLiveTab] = useState<LiveTab>('live')
+  const [autoCashout, setAutoCashout] = useState('')
 
-  const potential = numAmount * multiplier;
-
-  const adjustAmount = (delta: number) => {
-    const cur = parseFloat(amount) || 0;
-    const next = Math.max(0, cur + delta);
-    setAmount(String(next));
-  };
-
-  const doubleAmount = () => {
-    const cur = parseFloat(amount) || 0;
-    setAmount(String(cur * 2));
-  };
-
-  const halfAmount = () => {
-    const cur = parseFloat(amount) || 0;
-    setAmount(String(Math.max(1, Math.round(cur / 2))));
-  };
+  const decrease = () => setAmount((prev) => Math.max(MIN_AMOUNT, Number((prev - STEP).toFixed(2))))
+  const increase = () => setAmount((prev) => Number((prev + STEP).toFixed(2)))
 
   return (
-    <div className="bg-[#111827] rounded-xl border border-white/8 p-3 flex flex-col gap-2">
-      <div className="flex items-center gap-2 mb-1">
-        <div className="w-5 h-5 rounded-full bg-red-500/20 border border-red-500/40 flex items-center justify-center text-xs font-bold text-red-400">
-          {betNum}
+    <div className="flex flex-col gap-0">
+      <div className="rounded-xl border border-[#2a2a3e] bg-[#1a1a2e] p-4">
+        {/* Tab Switcher */}
+        <div className="mx-auto mb-4 flex w-[220px] rounded-full bg-[#12121f] p-1">
+          <TabButton label="Bet" active={activeTab === 'bet'} onClick={() => setActiveTab('bet')} />
+          <TabButton label="Auto" active={activeTab === 'auto'} onClick={() => setActiveTab('auto')} />
         </div>
-        <span className="text-white/60 text-xs font-medium uppercase tracking-wider">Bet {betNum}</span>
-        {cashedOut && (
-          <div className="ml-auto bg-green-500/20 border border-green-500/30 rounded px-2 py-0.5 text-green-400 text-xs font-bold fade-in">
-            +{cashedOut.profit.toFixed(2)} @ {cashedOut.at.toFixed(2)}x
+
+        {activeTab === 'bet' ? (
+          /* Bet Tab */
+          <div className="flex flex-row gap-4">
+            {/* Left — Amount Controls */}
+            <div className="flex flex-col flex-1">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={decrease}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-[#3a3a4e] bg-[#2a2a3e] text-lg font-bold text-foreground transition-colors hover:border-[#00E676]/30 active:scale-95"
+                >
+                  −
+                </button>
+                <span className="min-w-[70px] text-center font-mono text-lg font-bold text-foreground">
+                  {amount % 1 === 0 ? amount.toLocaleString() : amount.toFixed(2)}
+                </span>
+                <button
+                  type="button"
+                  onClick={increase}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-[#3a3a4e] bg-[#2a2a3e] text-lg font-bold text-foreground transition-colors hover:border-[#00E676]/30 active:scale-95"
+                >
+                  +
+                </button>
+              </div>
+              {/* Quick Amount Grid */}
+              <div className="mt-2 grid grid-cols-4 gap-1.5">
+                {QUICK_AMOUNTS.map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setAmount(value)}
+                    className="rounded-md border border-[#2a2a3e] bg-[#12121f] px-2 py-1.5 font-mono text-xs text-muted-foreground transition-colors hover:border-[#00E676]/30 hover:text-foreground"
+                  >
+                    {value >= 1000 ? `${value / 1000}k` : value}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Right — BET Button */}
+            <button
+              type="button"
+              className="flex flex-col items-center justify-center rounded-xl bg-[#00E676] px-6 py-4 transition-all duration-150 hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] min-w-[90px]"
+            >
+              <span className="text-xl font-bold text-[#0d0d1a]">BET</span>
+              <span className="text-xs font-medium text-[#0d0d1a]/80 font-mono">
+                {amount.toFixed(2)} {currency}
+              </span>
+            </button>
+          </div>
+        ) : (
+          /* Auto Tab */
+          <div className="flex flex-row gap-4">
+            <div className="flex flex-col flex-1 gap-2">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={decrease}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-[#3a3a4e] bg-[#2a2a3e] text-lg font-bold text-foreground transition-colors hover:border-[#00E676]/30 active:scale-95"
+                >
+                  −
+                </button>
+                <span className="min-w-[70px] text-center font-mono text-lg font-bold text-foreground">
+                  {amount % 1 === 0 ? amount.toLocaleString() : amount.toFixed(2)}
+                </span>
+                <button
+                  type="button"
+                  onClick={increase}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-[#3a3a4e] bg-[#2a2a3e] text-lg font-bold text-foreground transition-colors hover:border-[#00E676]/30 active:scale-95"
+                >
+                  +
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">Auto cash out at</span>
+                <input
+                  type="number"
+                  value={autoCashout}
+                  onChange={e => setAutoCashout(e.target.value)}
+                  placeholder="2.00x"
+                  min={1.01}
+                  step={0.1}
+                  className="flex-1 h-8 px-2 rounded-lg bg-[#12121f] border border-[#2a2a3e] text-foreground text-xs font-mono text-center focus:outline-none focus:border-[#00E676]/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="flex flex-col items-center justify-center rounded-xl bg-[#00E676] px-6 py-4 transition-all duration-150 hover:brightness-110 hover:scale-[1.02] active:scale-[0.98] min-w-[90px]"
+            >
+              <span className="text-xl font-bold text-[#0d0d1a]">AUTO</span>
+              <span className="text-xs font-medium text-[#0d0d1a]/80 font-mono">
+                {amount.toFixed(2)} {currency}
+              </span>
+            </button>
           </div>
         )}
-        {phase === "flying" && isActive && !cashedOut && (
-          <div className="ml-auto text-xs text-white/40">
-            ≈ {potential.toFixed(2)}
+      </div>
+
+      {/* Live Bets Panel */}
+      {showLiveBets && (
+        <div className="rounded-xl border border-[#2a2a3e] bg-[#1a1a2e] overflow-hidden mt-1">
+          {/* Sub-tabs */}
+          <div className="flex border-b border-[#2a2a3e]">
+            <button
+              type="button"
+              onClick={() => setLiveTab('live')}
+              className={`flex-1 py-2 text-xs font-semibold transition-colors ${
+                liveTab === 'live'
+                  ? 'text-[#00E676] border-b-2 border-[#00E676]'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              All Bets
+            </button>
+            <button
+              type="button"
+              onClick={() => setLiveTab('mine')}
+              className={`flex-1 py-2 text-xs font-semibold transition-colors ${
+                liveTab === 'mine'
+                  ? 'text-[#00E676] border-b-2 border-[#00E676]'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              My Bets
+            </button>
           </div>
-        )}
-      </div>
 
-      <div className="flex items-center gap-1.5">
-        <button
-          onClick={halfAmount}
-          disabled={isActive && phase !== "waiting"}
-          className="h-8 px-2 rounded bg-white/5 hover:bg-white/10 text-white/60 text-xs font-mono transition-colors disabled:opacity-40"
-        >
-          ½
-        </button>
-        <div className="flex-1 relative">
-          <input
-            type="number"
-            value={amount}
-            onChange={e => setAmount(e.target.value)}
-            disabled={isActive}
-            min={0}
-            className="w-full h-8 px-3 rounded bg-white/8 border border-white/10 text-white text-sm font-medium text-center focus:outline-none focus:border-red-500/50 disabled:opacity-60 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-          />
-        </div>
-        <button
-          onClick={doubleAmount}
-          disabled={isActive && phase !== "waiting"}
-          className="h-8 px-2 rounded bg-white/5 hover:bg-white/10 text-white/60 text-xs font-mono transition-colors disabled:opacity-40"
-        >
-          2×
-        </button>
-      </div>
+          {liveTab === 'live' && (
+            <div className="overflow-hidden">
+              {/* Header */}
+              <div className="grid grid-cols-4 px-3 py-1.5 text-[10px] font-semibold uppercase text-muted-foreground border-b border-[#2a2a3e]/50">
+                <span>User</span>
+                <span className="text-right">Bet ({currency})</span>
+                <span className="text-right">Cash Out</span>
+                <span className="text-right">Won ({currency})</span>
+              </div>
+              <div className="max-h-48 overflow-y-auto hide-scrollbar">
+                {MOCK_LIVE_BETS.map((row) => (
+                  <div
+                    key={row.id}
+                    className="grid grid-cols-4 px-3 py-1.5 text-xs border-b border-[#2a2a3e]/30 hover:bg-[#2a2a3e]/20 transition-colors"
+                  >
+                    <span className="text-foreground font-mono">{row.user}</span>
+                    <span className="text-right text-muted-foreground font-mono">
+                      {row.bet.toFixed(2)}
+                    </span>
+                    <span
+                      className="text-right font-mono font-semibold"
+                      style={{ color: getCashoutColor(row.cashout) }}
+                    >
+                      {row.cashout.toFixed(2)}x
+                    </span>
+                    <span
+                      className="text-right font-mono font-bold"
+                      style={{ color: row.high ? '#E91E63' : '#00E676' }}
+                    >
+                      {row.won.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-      <div className="flex gap-1.5 flex-wrap">
-        {QUICK_AMOUNTS.map(a => (
-          <button
-            key={a}
-            onClick={() => setAmount(String(a))}
-            disabled={isActive}
-            className="flex-1 min-w-[3rem] h-7 rounded bg-white/5 hover:bg-white/10 text-white/50 text-xs transition-colors disabled:opacity-40"
-          >
-            {a >= 1000 ? `${a / 1000}k` : a}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => setAutoEnabled(!autoEnabled)}
-          disabled={isActive && phase !== "waiting"}
-          className={`flex items-center gap-1.5 text-xs transition-colors ${autoEnabled ? "text-amber-400" : "text-white/40"} disabled:opacity-40`}
-        >
-          <div className={`w-7 h-4 rounded-full relative transition-colors ${autoEnabled ? "bg-amber-500" : "bg-white/10"}`}>
-            <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${autoEnabled ? "left-3.5" : "left-0.5"}`} />
-          </div>
-          Auto
-        </button>
-        {autoEnabled && (
-          <div className="flex-1 relative">
-            <input
-              type="number"
-              value={autoCashOut}
-              onChange={e => setAutoCashOut(e.target.value)}
-              disabled={isActive && phase !== "waiting"}
-              placeholder="2.00x"
-              min={1.01}
-              step={0.1}
-              className="w-full h-7 px-2 rounded bg-white/8 border border-amber-500/20 text-amber-300 text-xs font-medium text-center focus:outline-none focus:border-amber-500/50 disabled:opacity-60 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-            />
-          </div>
-        )}
-      </div>
-
-      {canPlace && (
-        <button
-          onClick={onPlace}
-          className="w-full h-10 rounded-lg bg-gradient-to-r from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 text-white font-bold text-sm transition-all active:scale-95"
-        >
-          BET {numAmount.toFixed(2)}
-        </button>
-      )}
-
-      {canCancel && (
-        <button
-          onClick={onCancel}
-          className="w-full h-10 rounded-lg bg-white/10 hover:bg-white/15 text-white font-bold text-sm transition-all active:scale-95 border border-white/10"
-        >
-          CANCEL ({numAmount.toFixed(2)})
-        </button>
-      )}
-
-      {canCashOut && (
-        <button
-          onClick={onCashOut}
-          className="w-full h-10 rounded-lg bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-400 hover:to-orange-400 text-white font-bold text-sm transition-all active:scale-95"
-          style={{ animation: "none" }}
-        >
-          CASH OUT {potential.toFixed(2)}
-        </button>
-      )}
-
-      {phase === "flying" && isActive && cashedOut && (
-        <div className="w-full h-10 rounded-lg bg-green-500/10 border border-green-500/20 flex items-center justify-center text-green-400 text-sm font-bold">
-          ✓ Cashed out @ {cashedOut.at.toFixed(2)}x
-        </div>
-      )}
-
-      {phase === "flying" && !isActive && (
-        <div className="w-full h-10 rounded-lg bg-white/5 flex items-center justify-center text-white/30 text-sm">
-          No bet placed
-        </div>
-      )}
-
-      {phase === "crashed" && isActive && !cashedOut && (
-        <div className="w-full h-10 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 text-sm font-bold">
-          ✗ Flew away
-        </div>
-      )}
-
-      {phase === "crashed" && !isActive && (
-        <div className="w-full h-10 rounded-lg bg-white/5 flex items-center justify-center text-white/30 text-sm">
-          Round over
+          {liveTab === 'mine' && (
+            <div className="flex items-center justify-center h-24 text-muted-foreground text-sm">
+              No bets this round
+            </div>
+          )}
         </div>
       )}
     </div>
-  );
+  )
 }

@@ -15,11 +15,13 @@ interface GameCanvasProps {
 
 const PAD = { left: 44, right: 16, top: 20, bottom: 20 }
 
-function toPx(p: CurvePoint, w: number, h: number) {
+const MAX_X = 0.92
+
+function toPx(p: CurvePoint, w: number, h: number, viewOffset = 0) {
   const dw = w - PAD.left - PAD.right
   const dh = h - PAD.top - PAD.bottom
   return {
-    cx: PAD.left + p.x * dw,
+    cx: PAD.left + (p.x - viewOffset) * dw,
     cy: PAD.top + (1 - p.y) * dh,
   }
 }
@@ -139,7 +141,8 @@ function drawTrail(
   ctx: CanvasRenderingContext2D,
   w: number,
   h: number,
-  points: CurvePoint[]
+  points: CurvePoint[],
+  viewOffset = 0
 ) {
   if (points.length < 2) return
   const ox  = PAD.left
@@ -148,7 +151,7 @@ function drawTrail(
   const raw = points[0].x > 0.001 || points[0].y > 0.015
     ? [{ x: 0, y: 0.012 }, ...points]
     : points
-  const pts = raw.map((p) => toPx(p, w, h))
+  const pts = raw.map((p) => toPx(p, w, h, viewOffset))
 
   ctx.save()
   ctx.beginPath()
@@ -535,12 +538,14 @@ export function GameCanvas({
         drawPlane(ctx, noseX, noseY, WAIT_ANGLE, false)
       }
 
+      const viewOffset = Math.max(0, plane.nx - MAX_X * 0.85)
+
       // ── FLYING: trail + animated plane ──────────────────────────────
       if (isFlying && trailPoints.length >= 2) {
-        drawTrail(ctx, CW, CH, trailPoints)
+        drawTrail(ctx, CW, CH, trailPoints, viewOffset)
       }
       if (isFlying && !plane.offScreen) {
-        const tailX    = PAD.left + plane.nx * dw
+        const tailX    = PAD.left + (plane.nx - viewOffset) * dw
         const tailY    = PAD.top  + (1 - plane.ny) * dh
         const angleRad = (plane.angleDeg * Math.PI) / 180
         const noseX    = tailX + 94 * Math.cos(angleRad)
@@ -550,7 +555,7 @@ export function GameCanvas({
       }
 
       if (isCrashing && !plane.offScreen) {
-        const tailX    = PAD.left + (plane.nx + plane.crashOffsetX) * dw
+        const tailX    = PAD.left + (plane.nx + plane.crashOffsetX - viewOffset) * dw
         const tailY    = PAD.top  + (1 - (plane.ny + plane.crashOffsetY)) * dh
         const angleRad = (plane.angleDeg * Math.PI) / 180
         const noseX    = tailX + 94 * Math.cos(angleRad)

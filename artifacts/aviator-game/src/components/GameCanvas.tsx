@@ -29,7 +29,7 @@ function toPx(p: CurvePoint, w: number, h: number) {
 
 // ── Background with radiating rays ─────────────────────────────────────────
 
-function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number) {
+function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, time: number) {
   ctx.fillStyle = '#0e0e0e'
   ctx.fillRect(0, 0, w, h)
 
@@ -40,10 +40,11 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number) {
   const fanStart = -Math.PI
   const fanEnd   = -Math.PI * 0.02
   const fanSpan  = fanEnd - fanStart
+  const rotOff   = (time * 0.00008) % (Math.PI * 2)
 
   for (let i = 0; i < numRays; i++) {
-    const a1 = fanStart + (i / numRays) * fanSpan
-    const a2 = fanStart + ((i + 0.45) / numRays) * fanSpan
+    const a1 = fanStart + (i / numRays) * fanSpan + rotOff
+    const a2 = fanStart + ((i + 0.45) / numRays) * fanSpan + rotOff
     ctx.beginPath()
     ctx.moveTo(ox, oy)
     ctx.lineTo(ox + Math.cos(a1) * maxDist, oy + Math.sin(a1) * maxDist)
@@ -60,6 +61,35 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number) {
   glow.addColorStop(1,    'transparent')
   ctx.fillStyle = glow
   ctx.fillRect(0, 0, w, h)
+}
+
+function drawDots(ctx: CanvasRenderingContext2D, w: number, h: number, time: number) {
+  const ox = PAD.left
+  const oy = h - PAD.bottom
+  const bLen = w - PAD.left - PAD.right
+  const lLen = h - PAD.top - PAD.bottom
+
+  for (let i = 0; i < 16; i++) {
+    const t = ((time * 0.00018 + i / 16) % 1)
+    const x = ox + (1 - t) * bLen
+    const y = oy
+    const fade = t > 0.85 ? (1 - t) / 0.15 : 1
+    ctx.beginPath()
+    ctx.arc(x, y, 3, 0, Math.PI * 2)
+    ctx.fillStyle = `rgba(0,230,118,${0.7 * fade})`
+    ctx.fill()
+  }
+
+  for (let i = 0; i < 8; i++) {
+    const t = ((time * 0.00014 + i / 8) % 1)
+    const x = ox
+    const y = oy - (1 - t) * lLen
+    const fade = t > 0.85 ? (1 - t) / 0.15 : 1
+    ctx.beginPath()
+    ctx.arc(x, y, 3, 0, Math.PI * 2)
+    ctx.fillStyle = `rgba(0,230,118,${0.7 * fade})`
+    ctx.fill()
+  }
 }
 
 // ── Axes ───────────────────────────────────────────────────────────────────
@@ -439,40 +469,6 @@ function NautilusSpinner() {
   )
 }
 
-function DecorationDots() {
-  return (
-    <>
-      <div className="absolute bottom-[34px] left-[44px] right-[16px] flex justify-between pointer-events-none z-[2]">
-        {Array.from({ length: 16 }, (_, i) => (
-          <div
-            key={`b-${i}`}
-            className="h-[6px] w-[6px] rounded-full"
-            style={{
-              backgroundColor: '#00E676',
-              opacity: 0.65,
-              animation: 'dotPulse 2s ease-in-out infinite',
-              animationDelay: `${i * 0.08}s`,
-            }}
-          />
-        ))}
-      </div>
-      <div className="absolute left-[16px] top-[20px] bottom-[36px] flex flex-col justify-between pointer-events-none z-[2]">
-        {Array.from({ length: 8 }, (_, i) => (
-          <div
-            key={`l-${i}`}
-            className="h-[6px] w-[6px] rounded-full"
-            style={{
-              backgroundColor: '#00E676',
-              opacity: 0.65,
-              animation: 'dotPulse 2.5s ease-in-out infinite',
-              animationDelay: `${i * 0.18}s`,
-            }}
-          />
-        ))}
-      </div>
-    </>
-  )
-}
 
 // ── Main Component ────────────────────────────────────────────────────────
 
@@ -485,9 +481,6 @@ export function GameCanvas({
   plane,
   betMode,
   onToggleBetMode,
-  serverSeedHash,
-  nonce,
-  revealedSeed,
 }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rafRef    = useRef(0)
@@ -517,7 +510,7 @@ export function GameCanvas({
       }
 
       ctx.clearRect(0, 0, CW, CH)
-      drawBackground(ctx, CW, CH)
+      drawBackground(ctx, CW, CH, time)
 
       const isCrashing = phase === 'crashing'
       const isCrashed  = phase === 'crashed'
@@ -529,7 +522,10 @@ export function GameCanvas({
       const originX = PAD.left
       const originY = CH - PAD.bottom
 
-      drawAxes(ctx, CW, CH)
+      if (!isCrashed) {
+        drawAxes(ctx, CW, CH)
+        drawDots(ctx, CW, CH, time)
+      }
 
       // ── WAITING: plane rests in positive quadrant, tail near origin corner ──
       // WAIT_ANGLE: 30° so the plane clearly points into the positive X,Y area.
@@ -562,7 +558,7 @@ export function GameCanvas({
       }
 
       // ── CRASHING / CRASHED ───────────────────────────────────────────
-      if ((isCrashing || isCrashed) && trailPoints.length >= 2) {
+      if (isCrashing && trailPoints.length >= 2) {
         drawTrail(ctx, CW, CH, trailPoints, true)
       }
       if (isCrashing && !plane.offScreen) {
@@ -595,8 +591,6 @@ export function GameCanvas({
         style={{ display: 'block' }}
       />
 
-      <DecorationDots />
-
       {/* Top-left: bet mode toggle + network status */}
       <div className="absolute top-2 left-2 z-10 flex flex-col gap-0.5">
         <BetModeToggle betMode={betMode} onToggle={onToggleBetMode} />
@@ -611,28 +605,13 @@ export function GameCanvas({
             <div className="text-white font-bold text-sm tracking-widest uppercase">
               WAITING FOR NEXT ROUND
             </div>
-            <div className="mt-2 mx-auto w-40 h-1 bg-white/20 rounded-full overflow-hidden">
+            <div className="mt-2 mx-auto w-40 h-2 bg-white/10 rounded-full overflow-hidden">
               <div
-                className="h-full bg-white rounded-full transition-all"
+                className="h-full bg-[#00E676] rounded-full transition-all"
                 style={{ width: `${waitProgress}%` }}
               />
             </div>
           </div>
-          {/* Provably fair: server seed hash + nonce */}
-          {serverSeedHash && (
-            <div className="text-center px-3 py-1.5 rounded-lg" style={{ background: 'rgba(0,0,0,0.45)' }}>
-              <div className="text-[10px] text-white/40 uppercase tracking-widest mb-0.5">
-                Round #{nonce} · Provably Fair
-              </div>
-              <div
-                className="text-[9px] font-mono text-[#00E676]/70 break-all"
-                style={{ maxWidth: '320px', lineHeight: 1.5 }}
-                title="SHA-256 hash of this round's server seed — verify after the round"
-              >
-                {serverSeedHash}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -654,10 +633,7 @@ export function GameCanvas({
       {/* CRASHED overlay */}
       {isCrashed && (
         <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-          <div
-            className="text-center px-8 py-4 rounded-2xl border border-[#E91E63]/30 crashed-flash"
-            style={{ background: 'rgba(233,30,99,0.12)', backdropFilter: 'blur(6px)' }}
-          >
+          <div className="text-center">
             <div className="text-[#E91E63] text-xs font-bold tracking-widest uppercase mb-1">
               Flew Away!
             </div>
@@ -667,17 +643,6 @@ export function GameCanvas({
             >
               {crashPoint > 0 ? `${crashPoint.toFixed(2)}x` : `${multiplier.toFixed(2)}x`}
             </div>
-            {/* Provably fair: reveal server seed for verification */}
-            {revealedSeed && (
-              <div className="mt-3 border-t border-[#E91E63]/20 pt-2">
-                <div className="text-[9px] text-[#E91E63]/50 uppercase tracking-widest mb-0.5">
-                  Server Seed (verify)
-                </div>
-                <div className="text-[8px] font-mono text-[#E91E63]/60 break-all" style={{ maxWidth: '260px' }}>
-                  {revealedSeed}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}

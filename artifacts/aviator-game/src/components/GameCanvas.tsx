@@ -173,10 +173,10 @@ function drawPlane(
   angleRad: number,
   crashed = false
 ) {
-  const bodyFill    = crashed ? 'rgba(130,130,130,0.82)' : 'rgba(218,234,218,0.95)'
-  const wingFill    = crashed ? 'rgba(110,110,110,0.75)' : 'rgba(200,220,200,0.90)'
-  const stroke      = crashed ? 'rgba(110,110,110,0.6)'  : '#00E676'
-  const cockpitFill = crashed ? 'rgba(90,90,90,0.5)'     : 'rgba(80,200,130,0.55)'
+  const bodyFill    = crashed ? 'rgba(120,120,120,0.82)' : 'rgba(215,230,215,0.92)'
+  const wingFill    = crashed ? 'rgba(100,100,100,0.75)' : 'rgba(195,218,195,0.88)'
+  const stroke      = crashed ? 'rgba(100,100,100,0.55)' : '#00E676'
+  const cockpitFill = crashed ? 'rgba(80,80,80,0.5)'     : 'rgba(100,200,140,0.5)'
 
   ctx.save()
   ctx.translate(tipX, tipY)
@@ -184,97 +184,95 @@ function drawPlane(
 
   if (!crashed) {
     ctx.shadowColor = '#00E676'
-    ctx.shadowBlur  = 16
+    ctx.shadowBlur  = 18
   }
 
-  ctx.lineJoin = 'round'
-  ctx.lineCap  = 'round'
+  ctx.lineJoin  = 'round'
+  ctx.lineCap   = 'round'
   ctx.lineWidth = 1.5
 
-  // ── Main Wing (large swept-back, most prominent feature) ──────────────
-  ctx.beginPath()
-  ctx.moveTo(-26, -4.5)      // root leading edge (on upper fuselage)
-  ctx.lineTo(-70, -27)       // wingtip forward point
-  ctx.lineTo(-75, -22)       // wingtip aft point
-  ctx.bezierCurveTo(-70, -18, -60, -8, -58, -4.5)  // sweep back to root trailing
-  ctx.closePath()
+  // ── Wing (Path2D — large swept-back delta shape) ─────────────────────
+  const wing = new Path2D()
+  wing.moveTo(-26, -4.5)
+  wing.lineTo(-70, -27)
+  wing.lineTo(-75, -22)
+  wing.bezierCurveTo(-70, -18, -60, -8, -58, -4.5)
+  wing.closePath()
   ctx.fillStyle   = wingFill
   ctx.strokeStyle = stroke
-  ctx.fill()
-  ctx.stroke()
+  ctx.fill(wing)
+  ctx.stroke(wing)
 
-  // ── Vertical Tail Fin ─────────────────────────────────────────────────
-  ctx.beginPath()
-  ctx.moveTo(-80, -4.5)      // fin base front
-  ctx.bezierCurveTo(-80, -10, -83, -17, -86, -24)  // leading edge curves up
-  ctx.lineTo(-91, -4.5)      // fin base rear
-  ctx.closePath()
+  // ── Vertical Tail Fin (Path2D) ────────────────────────────────────────
+  const vFin = new Path2D()
+  vFin.moveTo(-80, -4.5)
+  vFin.bezierCurveTo(-80, -10, -83, -17, -86, -24)
+  vFin.lineTo(-91, -4.5)
+  vFin.closePath()
   ctx.fillStyle   = wingFill
   ctx.strokeStyle = stroke
-  ctx.fill()
-  ctx.stroke()
+  ctx.fill(vFin)
+  ctx.stroke(vFin)
 
-  // ── Horizontal Stabilizer ─────────────────────────────────────────────
-  ctx.beginPath()
-  ctx.moveTo(-80, -4.5)      // root leading edge
-  ctx.lineTo(-94, -15)       // tip forward
-  ctx.lineTo(-96, -11)       // tip aft
-  ctx.bezierCurveTo(-92, -8, -88, -5, -86, -4.5)  // sweep back to root
-  ctx.closePath()
+  // ── Horizontal Stabilizer (Path2D) ────────────────────────────────────
+  const hStab = new Path2D()
+  hStab.moveTo(-80, -4.5)
+  hStab.lineTo(-94, -15)
+  hStab.lineTo(-96, -11)
+  hStab.bezierCurveTo(-92, -8, -88, -5, -86, -4.5)
+  hStab.closePath()
   ctx.fillStyle   = wingFill
   ctx.strokeStyle = stroke
-  ctx.fill()
-  ctx.stroke()
+  ctx.fill(hStab)
+  ctx.stroke(hStab)
 
-  // ── Fuselage (main body — drawn on top of wing/tail roots) ───────────
-  ctx.beginPath()
-  // Start at nose tip (0,0)
-  ctx.moveTo(0, 0)
-  // Upper surface: nose → cockpit hump → flat → tail taper
-  ctx.bezierCurveTo(-2, -1.5, -6, -4.5, -12, -5.2)   // nose / cockpit rise
-  ctx.bezierCurveTo(-18, -5.8, -22, -6.2, -28, -6)   // cockpit top
-  ctx.bezierCurveTo(-35, -5.8, -55, -5.2, -72, -4.8) // long upper flat run
-  ctx.bezierCurveTo(-80, -4.5, -87, -3.5, -92, -1.5) // tail taper upper
-  // Tail end
-  ctx.lineTo(-94, 0)
-  // Lower surface: tail → belly → nose
-  ctx.bezierCurveTo(-88, 2, -75, 3.2, -55, 3.5)      // tail to belly
-  ctx.bezierCurveTo(-35, 3.5, -18, 2.8, -6, 1.2)     // belly to nose lower
-  ctx.bezierCurveTo(-3, 0.6, -1, 0.2, 0, 0)          // nose lower close
-  ctx.closePath()
+  // ── Fuselage (Path2D — main body drawn over wing/tail roots) ─────────
+  const fuselage = new Path2D()
+  fuselage.moveTo(0, 0)
+  fuselage.bezierCurveTo(-2,  -1.5, -6,  -4.5, -12, -5.2)
+  fuselage.bezierCurveTo(-18, -5.8, -22, -6.2, -28, -6)
+  fuselage.bezierCurveTo(-35, -5.8, -55, -5.2, -72, -4.8)
+  fuselage.bezierCurveTo(-80, -4.5, -87, -3.5, -92, -1.5)
+  fuselage.lineTo(-94, 0)
+  fuselage.bezierCurveTo(-88,  2,   -75,  3.2, -55, 3.5)
+  fuselage.bezierCurveTo(-35,  3.5, -18,  2.8,  -6, 1.2)
+  fuselage.bezierCurveTo(-3,   0.6,  -1,  0.2,   0, 0)
+  fuselage.closePath()
   ctx.fillStyle   = bodyFill
   ctx.strokeStyle = stroke
-  ctx.fill()
-  ctx.stroke()
+  ctx.fill(fuselage)
+  ctx.stroke(fuselage)
 
-  // ── Cockpit Window ────────────────────────────────────────────────────
+  // ── Cockpit Window (Path2D — no shadow, translucent tint) ────────────
   ctx.shadowBlur = 0
-  ctx.beginPath()
-  ctx.moveTo(-6, -4.5)
-  ctx.bezierCurveTo(-10, -5.2, -16, -6.5, -24, -6.2)
-  ctx.bezierCurveTo(-27, -6.0, -30, -5.5, -32, -4.8)
-  ctx.lineTo(-10, -4.8)
-  ctx.closePath()
+  const cockpit = new Path2D()
+  cockpit.moveTo(-6,  -4.5)
+  cockpit.bezierCurveTo(-10, -5.2, -16, -6.5, -24, -6.2)
+  cockpit.bezierCurveTo(-27, -6.0, -30, -5.5, -32, -4.8)
+  cockpit.lineTo(-10, -4.8)
+  cockpit.closePath()
   ctx.fillStyle   = cockpitFill
   ctx.strokeStyle = 'transparent'
-  ctx.fill()
+  ctx.fill(cockpit)
 
-  // ── Engine nacelles (rear-mounted, on fuselage sides near tail) ───────
-  if (!crashed) ctx.shadowBlur = 6
-
-  // Port engine
-  ctx.beginPath()
-  ctx.ellipse(-70, 2.5, 11, 3.2, -0.08, 0, Math.PI * 2)
+  // ── Engine Nacelle (Path2D — single pod under belly at tail) ──────────
+  if (!crashed) {
+    ctx.shadowColor = '#00E676'
+    ctx.shadowBlur  = 6
+  }
+  const engine = new Path2D()
+  engine.ellipse(-70, 2.5, 11, 3.2, -0.08, 0, Math.PI * 2)
   ctx.fillStyle   = wingFill
   ctx.strokeStyle = stroke
-  ctx.fill()
-  ctx.stroke()
+  ctx.fill(engine)
+  ctx.stroke(engine)
 
-  // Starboard engine intake highlight
-  ctx.beginPath()
-  ctx.ellipse(-70, 2.5, 5, 2.2, -0.08, Math.PI, Math.PI * 2)
-  ctx.fillStyle = 'rgba(0,0,0,0.35)'
-  ctx.fill()
+  // Engine intake shadow
+  const intake = new Path2D()
+  intake.ellipse(-70, 2.5, 5, 2.2, -0.08, Math.PI, Math.PI * 2)
+  ctx.fillStyle   = 'rgba(0,0,0,0.35)'
+  ctx.strokeStyle = 'transparent'
+  ctx.fill(intake)
 
   ctx.shadowBlur = 0
   ctx.restore()

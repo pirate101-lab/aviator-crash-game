@@ -45,7 +45,7 @@ const MAX_Y = 0.85
 const TRAVERSE_MS = 10000
 
 function mapX(elMs: number): number {
-  return (elMs / TRAVERSE_MS) * MAX_X
+  return Math.min(MAX_X, (elMs / TRAVERSE_MS) * MAX_X)
 }
 
 function mapY(mult: number): number {

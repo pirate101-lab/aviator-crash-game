@@ -176,18 +176,19 @@ function drawPlane(
   angleRad: number,
   crashed = false
 ) {
-  const bodyFill    = crashed ? 'rgba(120,120,120,0.82)' : 'rgba(215,230,215,0.92)'
-  const wingFill    = crashed ? 'rgba(100,100,100,0.75)' : 'rgba(195,218,195,0.88)'
+  const bodyFill    = crashed ? 'rgba(120,120,120,0.82)' : 'rgba(248,255,248,0.98)'
+  const wingFill    = crashed ? 'rgba(100,100,100,0.75)' : 'rgba(228,248,230,0.97)'
   const stroke      = crashed ? 'rgba(100,100,100,0.55)' : '#00E676'
-  const cockpitFill = crashed ? 'rgba(80,80,80,0.5)'     : 'rgba(100,200,140,0.5)'
+  const cockpitFill = crashed ? 'rgba(80,80,80,0.5)'     : 'rgba(140,220,160,0.6)'
 
   ctx.save()
   ctx.translate(tipX, tipY)
   ctx.rotate(-angleRad)
 
+  // Dark halo first — separates the white plane from the bright background
   if (!crashed) {
-    ctx.shadowColor = '#00E676'
-    ctx.shadowBlur  = 18
+    ctx.shadowColor = 'rgba(0,0,0,0.85)'
+    ctx.shadowBlur  = 6
   }
 
   ctx.lineJoin  = 'round'
@@ -260,8 +261,8 @@ function drawPlane(
 
   // ── Engine Nacelles (Path2D — twin rear-mounted pods, port & starboard) ──
   if (!crashed) {
-    ctx.shadowColor = '#00E676'
-    ctx.shadowBlur  = 6
+    ctx.shadowColor = 'rgba(0,0,0,0.7)'
+    ctx.shadowBlur  = 4
   }
 
   // Port nacelle (lower, more visible from side view)
@@ -300,23 +301,25 @@ function drawPlane(
 
 // ── Exhaust particles ──────────────────────────────────────────────────────
 
+// tailX/tailY = position of the jet's tail (where exhaust emits).
+// Particles spread backward (negative local X) from the tail.
 function drawExhaust(
   ctx: CanvasRenderingContext2D,
-  tipX: number,
-  tipY: number,
+  tailX: number,
+  tailY: number,
   angleRad: number,
   time: number
 ) {
   ctx.save()
-  ctx.translate(tipX, tipY)
+  ctx.translate(tailX, tailY)
   ctx.rotate(-angleRad)
 
-  for (let i = 0; i < 12; i++) {
-    const offset = (time * 0.004 + i * 0.1) % 1
-    const x      = -94 - offset * 55
-    const y      = Math.sin(time * 0.012 + i * 0.9) * 2
-    const size   = (1 - offset) * 4.5 + 1
-    const alpha  = (1 - offset) * 0.5
+  for (let i = 0; i < 14; i++) {
+    const offset = (time * 0.004 + i * 0.085) % 1
+    const x      = -offset * 60          // spread backward from x=0 (tail)
+    const y      = Math.sin(time * 0.012 + i * 0.9) * 2.5
+    const size   = (1 - offset) * 5 + 1
+    const alpha  = (1 - offset) * 0.55
 
     ctx.beginPath()
     ctx.arc(x, y, size, 0, Math.PI * 2)
@@ -548,15 +551,20 @@ export function GameCanvas({
       }
 
       // ── FLYING: trail + animated plane ──────────────────────────────
+      // tailX/tailY = the trail tip = where the green line ends = the jet tail.
+      // The plane nose is drawn 94px forward along the flight direction so the
+      // jet clearly leads the trail, with exhaust emitting from the tail.
       if (isFlying && trailPoints.length >= 2) {
         drawTrail(ctx, CW, CH, trailPoints, false)
       }
       if (isFlying && !plane.offScreen) {
-        const tipX     = PAD.left + plane.nx * dw
-        const tipY     = PAD.top  + (1 - plane.ny) * dh
+        const tailX    = PAD.left + plane.nx * dw
+        const tailY    = PAD.top  + (1 - plane.ny) * dh
         const angleRad = (plane.angleDeg * Math.PI) / 180
-        drawExhaust(ctx, tipX, tipY, angleRad, time)
-        drawPlane(ctx, tipX, tipY, angleRad, false)
+        const noseX    = tailX + 94 * Math.cos(angleRad)
+        const noseY    = tailY - 94 * Math.sin(angleRad)
+        drawExhaust(ctx, tailX, tailY, angleRad, time)
+        drawPlane(ctx, noseX, noseY, angleRad, false)
       }
 
       // ── CRASHING / CRASHED ───────────────────────────────────────────
@@ -564,10 +572,12 @@ export function GameCanvas({
         drawTrail(ctx, CW, CH, trailPoints, true)
       }
       if (isCrashing && !plane.offScreen) {
-        const tipX     = PAD.left + (plane.nx + plane.crashOffsetX) * dw
-        const tipY     = PAD.top  + (1 - (plane.ny + plane.crashOffsetY)) * dh
+        const tailX    = PAD.left + (plane.nx + plane.crashOffsetX) * dw
+        const tailY    = PAD.top  + (1 - (plane.ny + plane.crashOffsetY)) * dh
         const angleRad = (plane.angleDeg * Math.PI) / 180
-        drawPlane(ctx, tipX, tipY, angleRad, true)
+        const noseX    = tailX + 94 * Math.cos(angleRad)
+        const noseY    = tailY - 94 * Math.sin(angleRad)
+        drawPlane(ctx, noseX, noseY, angleRad, true)
       }
 
       rafRef.current = requestAnimationFrame(render)

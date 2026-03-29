@@ -255,24 +255,41 @@ function drawPlane(
   ctx.strokeStyle = 'transparent'
   ctx.fill(cockpit)
 
-  // ── Engine Nacelle (Path2D — single pod under belly at tail) ──────────
+  // ── Engine Nacelles (Path2D — twin rear-mounted pods, port & starboard) ──
   if (!crashed) {
     ctx.shadowColor = '#00E676'
     ctx.shadowBlur  = 6
   }
-  const engine = new Path2D()
-  engine.ellipse(-70, 2.5, 11, 3.2, -0.08, 0, Math.PI * 2)
+
+  // Port nacelle (lower, more visible from side view)
+  const enginePort = new Path2D()
+  enginePort.ellipse(-70, 3.5, 11, 3.0, -0.08, 0, Math.PI * 2)
   ctx.fillStyle   = wingFill
   ctx.strokeStyle = stroke
-  ctx.fill(engine)
-  ctx.stroke(engine)
+  ctx.fill(enginePort)
+  ctx.stroke(enginePort)
 
-  // Engine intake shadow
-  const intake = new Path2D()
-  intake.ellipse(-70, 2.5, 5, 2.2, -0.08, Math.PI, Math.PI * 2)
+  // Port intake shadow
+  const intakePort = new Path2D()
+  intakePort.ellipse(-70, 3.5, 5, 2.0, -0.08, Math.PI, Math.PI * 2)
   ctx.fillStyle   = 'rgba(0,0,0,0.35)'
   ctx.strokeStyle = 'transparent'
-  ctx.fill(intake)
+  ctx.fill(intakePort)
+
+  // Starboard nacelle (upper, slightly forward — opposite side of fuselage)
+  const engineStbd = new Path2D()
+  engineStbd.ellipse(-68, -7.5, 10, 2.8, -0.08, 0, Math.PI * 2)
+  ctx.fillStyle   = wingFill
+  ctx.strokeStyle = stroke
+  ctx.fill(engineStbd)
+  ctx.stroke(engineStbd)
+
+  // Starboard intake shadow
+  const intakeStbd = new Path2D()
+  intakeStbd.ellipse(-68, -7.5, 4.5, 1.8, -0.08, Math.PI, Math.PI * 2)
+  ctx.fillStyle   = 'rgba(0,0,0,0.35)'
+  ctx.strokeStyle = 'transparent'
+  ctx.fill(intakeStbd)
 
   ctx.shadowBlur = 0
   ctx.restore()

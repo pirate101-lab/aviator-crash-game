@@ -11,9 +11,6 @@ interface GameCanvasProps {
   plane: PlaneTransform
   betMode: 'money' | 'freebet'
   onToggleBetMode: () => void
-  serverSeedHash: string
-  nonce: number
-  revealedSeed: string
 }
 
 const PAD = { left: 44, right: 16, top: 20, bottom: 36 }

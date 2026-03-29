@@ -13,7 +13,7 @@ interface GameCanvasProps {
   onToggleBetMode: () => void
 }
 
-const PAD = { left: 44, right: 16, top: 20, bottom: 36 }
+const PAD = { left: 44, right: 16, top: 20, bottom: 20 }
 
 function toPx(p: CurvePoint, w: number, h: number) {
   const dw = w - PAD.left - PAD.right
@@ -119,7 +119,11 @@ function drawTrail(
   if (points.length < 2) return
   const ox  = PAD.left
   const oy  = h - PAD.bottom
-  const pts = points.map((p) => toPx(p, w, h))
+
+  const raw = points[0].x > 0.001 || points[0].y > 0.001
+    ? [{ x: 0, y: 0 }, ...points]
+    : points
+  const pts = raw.map((p) => toPx(p, w, h))
 
   ctx.save()
   ctx.beginPath()
@@ -128,22 +132,27 @@ function drawTrail(
 
   const curvePath = new Path2D()
   curvePath.moveTo(pts[0].cx, pts[0].cy)
-  for (let i = 1; i < pts.length - 1; i++) {
-    const mx = (pts[i].cx + pts[i + 1].cx) / 2
-    const my = (pts[i].cy + pts[i + 1].cy) / 2
-    curvePath.quadraticCurveTo(pts[i].cx, pts[i].cy, mx, my)
+  for (let i = 1; i < pts.length; i++) {
+    if (i < pts.length - 1) {
+      const mx = (pts[i].cx + pts[i + 1].cx) / 2
+      const my = (pts[i].cy + pts[i + 1].cy) / 2
+      curvePath.quadraticCurveTo(pts[i].cx, pts[i].cy, mx, my)
+    } else {
+      curvePath.lineTo(pts[i].cx, pts[i].cy)
+    }
   }
-  curvePath.lineTo(pts[pts.length - 1].cx, pts[pts.length - 1].cy)
 
-  // Fill area under curve
   ctx.beginPath()
   ctx.moveTo(pts[0].cx, pts[0].cy)
-  for (let i = 1; i < pts.length - 1; i++) {
-    const mx = (pts[i].cx + pts[i + 1].cx) / 2
-    const my = (pts[i].cy + pts[i + 1].cy) / 2
-    ctx.quadraticCurveTo(pts[i].cx, pts[i].cy, mx, my)
+  for (let i = 1; i < pts.length; i++) {
+    if (i < pts.length - 1) {
+      const mx = (pts[i].cx + pts[i + 1].cx) / 2
+      const my = (pts[i].cy + pts[i + 1].cy) / 2
+      ctx.quadraticCurveTo(pts[i].cx, pts[i].cy, mx, my)
+    } else {
+      ctx.lineTo(pts[i].cx, pts[i].cy)
+    }
   }
-  ctx.lineTo(pts[pts.length - 1].cx, pts[pts.length - 1].cy)
   ctx.lineTo(pts[pts.length - 1].cx, oy)
   ctx.lineTo(pts[0].cx, oy)
   ctx.closePath()
@@ -526,19 +535,11 @@ export function GameCanvas({
         drawDots(ctx, CW, CH, time)
       }
 
-      // ── WAITING: plane rests in positive quadrant, tail near origin corner ──
-      // WAIT_ANGLE: 30° so the plane clearly points into the positive X,Y area.
-      // liftY: lifts the plane so even the fuselage belly (3.5 local px below
-      // centreline) clears the X-axis. The visible tail end sits just above and
-      // to the right of where the two green axes meet.
       if (isWaiting) {
-        const WAIT_ANGLE = 0.52          // 30° upward tilt in radians
-        const PLANE_LEN  = 94            // nose-to-tail length in local px
-        const BELLY_DEPTH = 3.5          // max fuselage extent below centreline
-        const MARGIN = 6                 // extra clearance in canvas px
-        const liftY  = Math.ceil(BELLY_DEPTH * Math.cos(WAIT_ANGLE)) + MARGIN
+        const WAIT_ANGLE = 0.52
+        const PLANE_LEN  = 94
         const noseX  = originX + PLANE_LEN * Math.cos(WAIT_ANGLE)
-        const noseY  = originY - PLANE_LEN * Math.sin(WAIT_ANGLE) - liftY
+        const noseY  = originY - PLANE_LEN * Math.sin(WAIT_ANGLE)
         drawPlane(ctx, noseX, noseY, WAIT_ANGLE, false)
       }
 

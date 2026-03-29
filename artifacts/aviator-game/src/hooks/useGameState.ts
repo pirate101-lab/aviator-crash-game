@@ -39,11 +39,6 @@ function computeMultiplier(ms: number): number {
   return Math.pow(Math.E, 0.00006 * ms)
 }
 
-function estimateCrashMs(cp: number): number {
-  if (cp <= 1) return 1
-  return Math.log(cp) / 0.00006
-}
-
 const MAX_X = 0.92
 const MAX_Y = 0.85
 
@@ -206,8 +201,8 @@ export function useGameState(): GameState {
 
       setMultiplier(mult)
 
-      const totalMs = estimateCrashMs(cp)
-      const t       = el / totalMs
+      const FIXED_ANIM_MS = 5000
+      const t       = el / FIXED_ANIM_MS
       const nx      = mapX(t)
       const ny      = mapY(mult, cp, t)
       const angle   = tiltDeg(ny, el)

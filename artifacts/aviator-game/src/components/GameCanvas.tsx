@@ -113,12 +113,33 @@ function drawAxes(ctx: CanvasRenderingContext2D, w: number, h: number) {
 
 // ── Trail curve ────────────────────────────────────────────────────────────
 
+function traceSmoothCurve(target: CanvasRenderingContext2D | Path2D, pts: { cx: number; cy: number }[]) {
+  target.moveTo(pts[0].cx, pts[0].cy)
+  if (pts.length === 2) { target.lineTo(pts[1].cx, pts[1].cy); return }
+  const tangents: { x: number; y: number }[] = []
+  for (let i = 0; i < pts.length; i++) {
+    if (i === 0) {
+      tangents.push({ x: pts[1].cx - pts[0].cx, y: pts[1].cy - pts[0].cy })
+    } else if (i === pts.length - 1) {
+      tangents.push({ x: pts[i].cx - pts[i - 1].cx, y: pts[i].cy - pts[i - 1].cy })
+    } else {
+      tangents.push({ x: (pts[i + 1].cx - pts[i - 1].cx) / 2, y: (pts[i + 1].cy - pts[i - 1].cy) / 2 })
+    }
+  }
+  for (let i = 0; i < pts.length - 1; i++) {
+    const cp1x = pts[i].cx + tangents[i].x / 3
+    const cp1y = pts[i].cy + tangents[i].y / 3
+    const cp2x = pts[i + 1].cx - tangents[i + 1].x / 3
+    const cp2y = pts[i + 1].cy - tangents[i + 1].y / 3
+    target.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, pts[i + 1].cx, pts[i + 1].cy)
+  }
+}
+
 function drawTrail(
   ctx: CanvasRenderingContext2D,
   w: number,
   h: number,
-  points: CurvePoint[],
-  crashed: boolean
+  points: CurvePoint[]
 ) {
   if (points.length < 2) return
   const ox  = PAD.left
@@ -135,65 +156,36 @@ function drawTrail(
   ctx.clip()
 
   const curvePath = new Path2D()
-  curvePath.moveTo(pts[0].cx, pts[0].cy)
-  for (let i = 1; i < pts.length; i++) {
-    if (i < pts.length - 1) {
-      const mx = (pts[i].cx + pts[i + 1].cx) / 2
-      const my = (pts[i].cy + pts[i + 1].cy) / 2
-      curvePath.quadraticCurveTo(pts[i].cx, pts[i].cy, mx, my)
-    } else {
-      curvePath.lineTo(pts[i].cx, pts[i].cy)
-    }
-  }
+  traceSmoothCurve(curvePath, pts)
 
   ctx.beginPath()
-  ctx.moveTo(pts[0].cx, pts[0].cy)
-  for (let i = 1; i < pts.length; i++) {
-    if (i < pts.length - 1) {
-      const mx = (pts[i].cx + pts[i + 1].cx) / 2
-      const my = (pts[i].cy + pts[i + 1].cy) / 2
-      ctx.quadraticCurveTo(pts[i].cx, pts[i].cy, mx, my)
-    } else {
-      ctx.lineTo(pts[i].cx, pts[i].cy)
-    }
-  }
+  traceSmoothCurve(ctx, pts)
   ctx.lineTo(pts[pts.length - 1].cx, oy)
   ctx.lineTo(pts[0].cx, oy)
   ctx.closePath()
 
-  if (!crashed) {
-    const g = ctx.createLinearGradient(0, pts[pts.length - 1].cy, 0, oy)
-    g.addColorStop(0,    'rgba(0,230,118,0.9)')
-    g.addColorStop(0.25, 'rgba(0,210,100,0.75)')
-    g.addColorStop(0.5,  'rgba(0,180,80,0.55)')
-    g.addColorStop(0.75, 'rgba(0,140,60,0.3)')
-    g.addColorStop(1,    'rgba(0,80,40,0.05)')
-    ctx.fillStyle = g
-    ctx.fill()
-  }
+  const g = ctx.createLinearGradient(0, pts[pts.length - 1].cy, 0, oy)
+  g.addColorStop(0,    'rgba(0,230,118,0.9)')
+  g.addColorStop(0.25, 'rgba(0,210,100,0.75)')
+  g.addColorStop(0.5,  'rgba(0,180,80,0.55)')
+  g.addColorStop(0.75, 'rgba(0,140,60,0.3)')
+  g.addColorStop(1,    'rgba(0,80,40,0.05)')
+  ctx.fillStyle = g
+  ctx.fill()
 
-  if (crashed) {
-    ctx.strokeStyle = 'rgba(100,100,100,0.5)'
-    ctx.lineWidth   = 2.5
-    ctx.setLineDash([5, 4])
-  } else {
-    ctx.strokeStyle = '#00E676'
-    ctx.lineWidth   = 3.5
-    ctx.shadowColor = 'rgba(0,230,118,0.9)'
-    ctx.shadowBlur  = 14
-  }
+  ctx.strokeStyle = '#00E676'
+  ctx.lineWidth   = 3.5
+  ctx.shadowColor = 'rgba(0,230,118,0.9)'
+  ctx.shadowBlur  = 14
   ctx.lineJoin = 'round'
   ctx.lineCap  = 'round'
   ctx.stroke(curvePath)
 
-  if (!crashed) {
-    ctx.strokeStyle = 'rgba(160,255,210,0.45)'
-    ctx.lineWidth   = 1.5
-    ctx.shadowBlur  = 0
-    ctx.stroke(curvePath)
-  }
+  ctx.strokeStyle = 'rgba(160,255,210,0.45)'
+  ctx.lineWidth   = 1.5
+  ctx.shadowBlur  = 0
+  ctx.stroke(curvePath)
 
-  ctx.setLineDash([])
   ctx.shadowBlur = 0
   ctx.restore()
 }
@@ -545,7 +537,7 @@ export function GameCanvas({
 
       // ── FLYING: trail + animated plane ──────────────────────────────
       if (isFlying && trailPoints.length >= 2) {
-        drawTrail(ctx, CW, CH, trailPoints, false)
+        drawTrail(ctx, CW, CH, trailPoints)
       }
       if (isFlying && !plane.offScreen) {
         const tailX    = PAD.left + plane.nx * dw
@@ -555,10 +547,6 @@ export function GameCanvas({
         const noseY    = tailY - 94 * Math.sin(angleRad)
         drawExhaust(ctx, tailX, tailY, angleRad, time)
         drawPlane(ctx, noseX, noseY, angleRad, false)
-      }
-
-      if ((isCrashing || isCrashed) && trailPoints.length >= 2) {
-        drawTrail(ctx, CW, CH, trailPoints, true)
       }
 
       if (isCrashing && !plane.offScreen) {

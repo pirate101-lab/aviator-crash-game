@@ -42,18 +42,17 @@ function computeMultiplier(ms: number): number {
 const MAX_X = 0.92
 const MAX_Y = 0.85
 
-function mapProgress(t: number): number {
-  return 1 - Math.exp(-2.2 * t)
+const TRAVERSE_MS = 8000
+
+function mapX(elMs: number): number {
+  return Math.min(MAX_X, (elMs / TRAVERSE_MS) * MAX_X)
 }
 
-function mapX(t: number): number {
-  return MAX_X * mapProgress(t)
-}
-
-function mapY(_mult: number, _cp: number, t: number): number {
-  const p = mapProgress(t)
-  const lift = 0.04 * (1 - Math.exp(-8 * t))
-  return MAX_Y * Math.pow(p, 1.5) + lift
+function mapY(mult: number): number {
+  const v = Math.max(0, mult - 1)
+  const base = Math.sqrt(v) * 0.28
+  const lift = 0.04 * Math.min(1, v * 8)
+  return Math.min(MAX_Y, base + lift)
 }
 
 function tiltDeg(ny: number, elapsedMs: number): number {
@@ -201,10 +200,8 @@ export function useGameState(): GameState {
 
       setMultiplier(mult)
 
-      const FIXED_ANIM_MS = 5000
-      const t       = el / FIXED_ANIM_MS
-      const nx      = mapX(t)
-      const ny      = mapY(mult, cp, t)
+      const nx      = mapX(el)
+      const ny      = mapY(mult)
       const angle   = tiltDeg(ny, el)
 
       if (el - lastPtMs.current >= POINT_INTERVAL_MS) {

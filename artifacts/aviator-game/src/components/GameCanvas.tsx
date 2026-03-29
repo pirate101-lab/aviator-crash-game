@@ -185,7 +185,6 @@ function drawPlane(
   ctx.translate(tipX, tipY)
   ctx.rotate(-angleRad)
 
-  // Dark halo first — separates the white plane from the bright background
   if (!crashed) {
     ctx.shadowColor = 'rgba(0,0,0,0.85)'
     ctx.shadowBlur  = 6
@@ -301,8 +300,6 @@ function drawPlane(
 
 // ── Exhaust particles ──────────────────────────────────────────────────────
 
-// tailX/tailY = position of the jet's tail (where exhaust emits).
-// Particles spread backward (negative local X) from the tail.
 function drawExhaust(
   ctx: CanvasRenderingContext2D,
   tailX: number,
@@ -316,7 +313,7 @@ function drawExhaust(
 
   for (let i = 0; i < 14; i++) {
     const offset = (time * 0.004 + i * 0.085) % 1
-    const x      = -offset * 60          // spread backward from x=0 (tail)
+    const x      = -offset * 60
     const y      = Math.sin(time * 0.012 + i * 0.9) * 2.5
     const size   = (1 - offset) * 5 + 1
     const alpha  = (1 - offset) * 0.55
@@ -551,9 +548,6 @@ export function GameCanvas({
       }
 
       // ── FLYING: trail + animated plane ──────────────────────────────
-      // tailX/tailY = the trail tip = where the green line ends = the jet tail.
-      // The plane nose is drawn 94px forward along the flight direction so the
-      // jet clearly leads the trail, with exhaust emitting from the tail.
       if (isFlying && trailPoints.length >= 2) {
         drawTrail(ctx, CW, CH, trailPoints, false)
       }

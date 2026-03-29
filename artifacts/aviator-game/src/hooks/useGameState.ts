@@ -42,7 +42,7 @@ function computeMultiplier(ms: number): number {
 const MAX_X = 0.92
 const MAX_Y = 0.85
 
-const TRAVERSE_MS = 8000
+const TRAVERSE_MS = 10000
 
 function mapX(elMs: number): number {
   return (elMs / TRAVERSE_MS) * MAX_X
@@ -50,9 +50,7 @@ function mapX(elMs: number): number {
 
 function mapY(mult: number): number {
   const v = Math.max(0, mult - 1)
-  const base = Math.sqrt(v) * 0.28
-  const lift = 0.04 * Math.min(1, v * 8)
-  return Math.min(MAX_Y, base + lift)
+  return Math.min(MAX_Y, Math.sqrt(v) * MAX_Y + 0.02 * Math.min(1, v * 10))
 }
 
 function tiltDeg(ny: number, elapsedMs: number): number {

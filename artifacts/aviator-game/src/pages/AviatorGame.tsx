@@ -36,7 +36,7 @@ export default function AviatorGame() {
           <RoundHistory history={game.roundHistory} />
 
           {/* Game canvas */}
-          <div className="flex-1 min-h-0 p-1">
+          <div className="flex-[2] min-h-0 p-1">
             <GameCanvas
               phase={game.phase}
               multiplier={game.multiplier}

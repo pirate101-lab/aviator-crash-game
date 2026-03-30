@@ -38,12 +38,13 @@ export const MAX_Y = 0.85
 export const TRAVERSE_MS = 10000
 
 export function mapX(elMs: number): number {
-  return Math.min(MAX_X, (elMs / TRAVERSE_MS) * MAX_X)
+  const t = Math.min(1, elMs / TRAVERSE_MS)
+  return Math.min(MAX_X, Math.pow(t, 1.6) * MAX_X)
 }
 
 export function mapY(mult: number): number {
   const v = Math.max(0, mult - 1)
-  return Math.min(MAX_Y, Math.sqrt(v) * MAX_Y + 0.02 * Math.min(1, v * 10))
+  return Math.min(MAX_Y, Math.pow(v, 0.38) * MAX_Y * 0.92)
 }
 
 function tiltDeg(ny: number, elapsedMs: number): number {

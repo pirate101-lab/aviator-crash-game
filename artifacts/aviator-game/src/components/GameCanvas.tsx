@@ -616,14 +616,14 @@ export function GameCanvas({
         </div>
       )}
 
-      {/* FLYING: large white multiplier */}
+      {/* FLYING: multiplier above the curve */}
       {phase === 'flying' && (
-        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+        <div className="absolute left-[15%] top-[18%] z-10 pointer-events-none">
           <div
             className="font-black text-white leading-none multiplier-display"
             style={{
-              fontSize: 'clamp(2.8rem, 9vw, 5.5rem)',
-              textShadow: '0 2px 30px rgba(255,255,255,0.3)',
+              fontSize: 'clamp(1.6rem, 5vw, 3.2rem)',
+              textShadow: '0 2px 20px rgba(255,255,255,0.25)',
             }}
           >
             {multiplier.toFixed(2)}x

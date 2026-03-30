@@ -105,7 +105,26 @@ function drawAxes(ctx: CanvasRenderingContext2D, w: number, h: number) {
 
 // ── Trail curve ────────────────────────────────────────────────────────────
 
-const NUM_CURVE_PTS = 80
+const NUM_CURVE_PTS = 60
+
+function traceCatmullRom(
+  target: CanvasRenderingContext2D | Path2D,
+  pts: { cx: number; cy: number }[]
+) {
+  target.moveTo(pts[0].cx, pts[0].cy)
+  if (pts.length === 2) { target.lineTo(pts[1].cx, pts[1].cy); return }
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)]
+    const p1 = pts[i]
+    const p2 = pts[i + 1]
+    const p3 = pts[Math.min(pts.length - 1, i + 2)]
+    const cp1x = p1.cx + (p2.cx - p0.cx) / 6
+    const cp1y = p1.cy + (p2.cy - p0.cy) / 6
+    const cp2x = p2.cx - (p3.cx - p1.cx) / 6
+    const cp2y = p2.cy - (p3.cy - p1.cy) / 6
+    target.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.cx, p2.cy)
+  }
+}
 
 function drawTrail(
   ctx: CanvasRenderingContext2D,
@@ -150,16 +169,10 @@ function drawTrail(
   ctx.clip()
 
   const curvePath = new Path2D()
-  curvePath.moveTo(pxPts[0].cx, pxPts[0].cy)
-  for (let i = 1; i < pxPts.length; i++) {
-    curvePath.lineTo(pxPts[i].cx, pxPts[i].cy)
-  }
+  traceCatmullRom(curvePath, pxPts)
 
   ctx.beginPath()
-  ctx.moveTo(pxPts[0].cx, pxPts[0].cy)
-  for (let i = 1; i < pxPts.length; i++) {
-    ctx.lineTo(pxPts[i].cx, pxPts[i].cy)
-  }
+  traceCatmullRom(ctx, pxPts)
   ctx.lineTo(pxPts[pxPts.length - 1].cx, oy)
   ctx.lineTo(pxPts[0].cx, oy)
   ctx.closePath()

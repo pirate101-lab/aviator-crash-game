@@ -209,24 +209,29 @@ export function useGameState(): GameState {
     phaseRef.current = 'crashing'
     setPhase('crashing')
 
-    // Reveal the server seed so players can verify
     setRevealedSeed(serverSeedRef.current)
 
     const t0 = performance.now()
     const snapNx = planeRef.current.nx
     const snapNy = planeRef.current.ny
+    const snapAngle = planeRef.current.angleDeg
+    const angleRad = (snapAngle * Math.PI) / 180
+    const dirX = Math.cos(angleRad)
+    const dirY = Math.sin(angleRad)
+    const speed = 3.5
 
     const tick = (now: number) => {
       if (phaseRef.current !== 'crashing') return
       const s = (now - t0) / 1000
-      const accel = 1 + s * 5
-      const offX  = 1.8 * s * accel
-      const offY  = -3.0 * s * accel
-      const gone  = (snapNx + offX > 1.5) || (snapNy + offY < -0.5)
+      const accel = 1 + s * 6
+      const dist = speed * s * accel
+      const offX = dirX * dist
+      const offY = dirY * dist
+      const gone = (snapNx + offX > 1.5) || (snapNy + offY > 1.5) || (snapNx + offX < -0.5) || (snapNy + offY < -0.5)
 
       setPlane({
         nx: snapNx, ny: snapNy,
-        angleDeg: 42 + s * 40,
+        angleDeg: snapAngle + s * 15,
         crashOffsetX: offX, crashOffsetY: offY,
         offScreen: gone,
       })

@@ -71,12 +71,12 @@ function Avatar({ color, user }: { color: string; user: string }) {
   )
 }
 
-export function LiveBetsSidebar({ phase }: { phase: string }) {
+export function LiveBetsSidebar({ phase, variant = 'sidebar' }: { phase: string; variant?: 'sidebar' | 'bottom' }) {
   const [tab, setTab] = useState<SidebarTab>('live')
   const bets = phase === 'flying' ? FLYING_BETS : MOCK_BETS
 
   return (
-    <div className="flex flex-col h-full bg-[#111111] border-r border-white/8">
+    <div className={`flex flex-col h-full bg-[#111111] ${variant === 'sidebar' ? 'border-r border-white/8' : 'border-t border-white/8'}`}>
       {/* Tabs */}
       <div className="flex flex-shrink-0 border-b border-white/8">
         <button

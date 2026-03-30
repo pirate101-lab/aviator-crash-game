@@ -24,12 +24,12 @@ export default function AviatorGame() {
       {/* Body: sidebar + right content */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
 
-        {/* Left sidebar: live bets */}
-        <div className="flex-shrink-0 overflow-hidden" style={{ width: '220px' }}>
+        {/* Left sidebar: live bets — desktop only (>768px) */}
+        <div className="hidden min-[769px]:flex flex-shrink-0 overflow-hidden" style={{ width: '220px' }}>
           <LiveBetsSidebar phase={game.phase} />
         </div>
 
-        {/* Right column: history + canvas + bet panels */}
+        {/* Right column: history + canvas + bet panels + mobile bets */}
         <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
 
           {/* Multiplier history bar */}
@@ -53,6 +53,11 @@ export default function AviatorGame() {
           <div className="flex-shrink-0 grid grid-cols-2 gap-2 px-2 pb-2">
             <BetPanel defaultAmount={25} currency="KSH" />
             <BetPanel defaultAmount={18} currency="KSH" />
+          </div>
+
+          {/* Live bets — mobile only (<=768px), below bet panels */}
+          <div className="flex-1 min-h-0 overflow-hidden min-[769px]:hidden">
+            <LiveBetsSidebar phase={game.phase} variant="bottom" />
           </div>
         </div>
       </div>

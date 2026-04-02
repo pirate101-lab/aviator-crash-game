@@ -7,6 +7,8 @@ interface FlightGraphProps {
   countdown: number;
 }
 
+const MAX_TRAIL_POINTS = 120;
+
 export function FlightGraph({ phase, multiplier, countdown }: FlightGraphProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pointsRef = useRef<{ x: number; y: number }[]>([]);
@@ -180,9 +182,6 @@ export function FlightGraph({ phase, multiplier, countdown }: FlightGraphProps) 
     const drawH = H - padBottom - padTop;
     const maxM = Math.max(multiplier * 1.2, 2.0);
 
-    const totalPoints = Math.max(2, pointsRef.current.length + 1);
-    const maxPoints = 200;
-
     const progress = Math.min(1, (multiplier - 1) / (maxM - 1));
     const x = padLeft + progress * drawW;
     const y = padTop + drawH - progress * drawH;
@@ -193,8 +192,8 @@ export function FlightGraph({ phase, multiplier, countdown }: FlightGraphProps) 
 
     pointsRef.current.push({ x, y });
 
-    if (pointsRef.current.length > maxPoints) {
-      pointsRef.current = pointsRef.current.slice(-maxPoints);
+    if (pointsRef.current.length > MAX_TRAIL_POINTS) {
+      pointsRef.current = pointsRef.current.slice(-MAX_TRAIL_POINTS);
     }
 
     drawFrame();

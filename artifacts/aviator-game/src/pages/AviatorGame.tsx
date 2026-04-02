@@ -14,7 +14,7 @@ export default function AviatorGame() {
 
   const historyEntries = game.roundHistory.map((multiplier, index) => ({
     multiplier,
-    timestamp: index,
+    timestamp: (index + 1) * 100_000 + Math.round(multiplier * 100),
   }));
 
   return (
@@ -25,7 +25,7 @@ export default function AviatorGame() {
         <Header balance={0} />
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          <aside className="hidden w-[240px] flex-shrink-0 overflow-hidden border-r border-white/8 min-[1024px]:block">
+          <aside className="hidden w-[220px] flex-shrink-0 overflow-hidden border-r border-white/8 min-[769px]:block">
             <LiveBetsSidebar phase={game.phase} />
           </aside>
 
@@ -35,7 +35,7 @@ export default function AviatorGame() {
               <HistoryBar history={historyEntries} />
             </div>
 
-            <div className="min-h-0 flex-1 p-1">
+            <div className="min-h-0 flex-1 p-2">
               <GameCanvas
                 phase={game.phase}
                 multiplier={game.multiplier}
@@ -80,7 +80,7 @@ export default function AviatorGame() {
               <BetPanel defaultAmount={18} currency="KSH" />
             </div>
 
-            <div className="min-h-0 flex-1 overflow-hidden min-[1024px]:hidden">
+            <div className="min-h-0 flex-1 overflow-hidden min-[769px]:hidden">
               <LiveBetsSidebar phase={game.phase} variant="bottom" />
             </div>
           </main>

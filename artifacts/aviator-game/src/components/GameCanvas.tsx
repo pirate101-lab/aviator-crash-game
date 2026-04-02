@@ -15,6 +15,11 @@ interface GameCanvasProps {
 }
 
 const PAD = { left: 44, right: 16, top: 20, bottom: 20 }
+const ANGLE_CALC_LOOKBACK_MS = 26
+const CRASH_ANGLE_OFFSET_RAD = 0.6
+const PLANE_LENGTH_PX = 94
+const NORMAL_FLIGHT_EXHAUST_INTENSITY = 1.1
+const CRASH_EXHAUST_INTENSITY = 0.6
 
 // ── Background with radiating rays ─────────────────────────────────────────
 
@@ -255,6 +260,26 @@ function drawPlaneSprite(
   ctx.restore()
 }
 
+function drawPlaneFallback(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  angleRad: number,
+  crashed = false
+) {
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.rotate(-angleRad)
+  ctx.beginPath()
+  ctx.moveTo(0, 0)
+  ctx.lineTo(-18, -6)
+  ctx.lineTo(-18, 6)
+  ctx.closePath()
+  ctx.fillStyle = crashed ? 'rgba(140,140,140,0.9)' : 'rgba(255,255,255,0.95)'
+  ctx.fill()
+  ctx.restore()
+}
+
 // ── JSX Overlays ──────────────────────────────────────────────────────────
 
 function BetModeToggle({
@@ -388,6 +413,9 @@ export function GameCanvas({
     const img = new Image()
     img.src = '/plane-sprite.png'
     img.onload = () => { planeImgRef.current = img }
+    img.onerror = () => {
+      console.error('Failed to load plane sprite: /plane-sprite.png')
+    }
   }, [])
 
   const render = useCallback(
@@ -439,19 +467,20 @@ export function GameCanvas({
 
         let angleRad = -0.35
         if (elapsedMs > 60) {
-          const prevMs = elapsedMs - 26
+          const prevMs = elapsedMs - ANGLE_CALC_LOOKBACK_MS
           const prevMult = computeMultiplier(prevMs)
           const dx = (mapX(elapsedMs) - mapX(prevMs)) * dw
           const dy = (mapY(currMult) - mapY(prevMult)) * dh
           angleRad = Math.atan2(-dy, dx)
         }
 
-        const noseX = tailX + 94 * Math.cos(angleRad)
-        const noseY = tailY - 94 * Math.sin(angleRad)
+        const noseX = tailX + PLANE_LENGTH_PX * Math.cos(angleRad)
+        const noseY = tailY - PLANE_LENGTH_PX * Math.sin(angleRad)
 
         const img = planeImgRef.current
-        drawExhaust(ctx, tailX, tailY, angleRad, time, 1.1)
+        drawExhaust(ctx, tailX, tailY, angleRad, time, NORMAL_FLIGHT_EXHAUST_INTENSITY)
         if (img) drawPlaneSprite(ctx, noseX, noseY, angleRad, img, false)
+        else drawPlaneFallback(ctx, noseX, noseY, angleRad, false)
       }
 
       if ((isCrashing || isCrashed) && !plane.offScreen) {
@@ -464,18 +493,19 @@ export function GameCanvas({
 
         let angleRad = -0.4
         if (elapsedMs > 60) {
-          const prevMs = elapsedMs - 26
+          const prevMs = elapsedMs - ANGLE_CALC_LOOKBACK_MS
           const dx = (mapX(elapsedMs) - mapX(prevMs)) * dw
           const dy = (mapY(currMult) - mapY(computeMultiplier(prevMs))) * dh
-          angleRad = Math.atan2(-dy, dx) + 0.6
+          angleRad = Math.atan2(-dy, dx) + CRASH_ANGLE_OFFSET_RAD
         }
 
-        const noseX = tailX + 94 * Math.cos(angleRad)
-        const noseY = tailY - 94 * Math.sin(angleRad)
+        const noseX = tailX + PLANE_LENGTH_PX * Math.cos(angleRad)
+        const noseY = tailY - PLANE_LENGTH_PX * Math.sin(angleRad)
 
         const img = planeImgRef.current
-        drawExhaust(ctx, tailX, tailY, angleRad, time, 0.6)
+        drawExhaust(ctx, tailX, tailY, angleRad, time, CRASH_EXHAUST_INTENSITY)
         if (img) drawPlaneSprite(ctx, noseX, noseY, angleRad, img, true)
+        else drawPlaneFallback(ctx, noseX, noseY, angleRad, true)
       }
 
       rafRef.current = requestAnimationFrame(render)

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 
 export type Phase = 'waiting' | 'flying' | 'crashing' | 'crashed'
 
@@ -28,6 +28,7 @@ const WAIT_MS           = 5000
 const CRASH_DISPLAY_MS  = 3000
 const FLY_AWAY_MS       = 700
 const MAX_HISTORY       = 20
+const MAX_TRAIL_POINTS  = 120
 
 export function computeMultiplier(ms: number): number {
   return Math.pow(Math.E, 0.00006 * ms)
@@ -111,6 +112,10 @@ export function useGameState(): GameState {
   const [elapsedMs, setElapsedMs]   = useState(0)
   const [plane, setPlane]           = useState<PlaneTransform>(DEFAULT_PLANE)
 
+  const computeMultiplierMemo = useMemo(() => {
+    return (t: number) => 1 + Math.pow(t / 850, 1.32) * 0.017
+  }, [])
+
   // Provably fair state
   const [serverSeedHash, setSeedHash]   = useState<string>('')
   const [nonce, setNonce]               = useState<number>(1)
@@ -180,7 +185,7 @@ export function useGameState(): GameState {
     const tick = (now: number) => {
       if (phaseRef.current !== 'flying') return
       const el   = now - tStart.current
-      const mult = computeMultiplier(el)
+      const mult = computeMultiplierMemo(el)
       const cp   = cpRef.current
 
       if (mult >= cp) { setMultiplier(cp); startCrash(); return }
@@ -203,7 +208,16 @@ export function useGameState(): GameState {
       raf.current = requestAnimationFrame(tick)
     }
     raf.current = requestAnimationFrame(tick)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [computeMultiplierMemo]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    let raf: number
+    const loop = () => {
+      raf = requestAnimationFrame(loop)
+    }
+    raf = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(raf)
+  }, [])
 
   const startCrash = useCallback(() => {
     stop()
@@ -242,7 +256,7 @@ export function useGameState(): GameState {
         setPhase('crashed')
         const cv = cpRef.current
         timeout.current = window.setTimeout(() => {
-          setHistory(prev => [...prev, cv].slice(-MAX_HISTORY))
+          setHistory(prev => [...prev, cv].slice(-Math.min(MAX_HISTORY, MAX_TRAIL_POINTS)))
           startWait()
         }, CRASH_DISPLAY_MS)
         return

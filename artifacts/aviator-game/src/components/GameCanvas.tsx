@@ -15,6 +15,11 @@ interface GameCanvasProps {
 }
 
 const PAD = { left: 44, right: 16, top: 20, bottom: 20 }
+const ANGLE_CALC_LOOKBACK_MS = 26
+const CRASH_ANGLE_OFFSET_RAD = 0.6
+const PLANE_LENGTH_PX = 94
+const NORMAL_FLIGHT_EXHAUST_INTENSITY = 1.1
+const CRASH_EXHAUST_INTENSITY = 0.6
 
 // ── Background with radiating rays ─────────────────────────────────────────
 
@@ -203,172 +208,75 @@ function drawTrail(
   ctx.restore()
 }
 
-// ── Code-drawn business jet ────────────────────────────────────────────────
-//
-// Local coordinate system:
-//   (0, 0) = nose tip, pointing right (+X)
-//   Fuselage extends to the left (−X), wings/fins extend up (−Y)
-//   Total span: ~98px left, ~30px up for wings
-//
-// Call with:
-//   ctx.translate(noseTipX, noseTipY)
-//   ctx.rotate(−angleRad)   [where angleRad = 0 is horizontal]
-
-function drawPlane(
-  ctx: CanvasRenderingContext2D,
-  tipX: number,
-  tipY: number,
-  angleRad: number,
-  crashed = false
-) {
-  const bodyFill    = crashed ? 'rgba(120,120,120,0.82)' : 'rgba(248,255,248,0.98)'
-  const wingFill    = crashed ? 'rgba(100,100,100,0.75)' : 'rgba(228,248,230,0.97)'
-  const stroke      = crashed ? 'rgba(100,100,100,0.55)' : '#00E676'
-  const cockpitFill = crashed ? 'rgba(80,80,80,0.5)'     : 'rgba(140,220,160,0.6)'
-
-  ctx.save()
-  ctx.translate(tipX, tipY)
-  ctx.rotate(-angleRad)
-
-  if (!crashed) {
-    ctx.shadowColor = 'rgba(0,0,0,0.85)'
-    ctx.shadowBlur  = 6
-  }
-
-  ctx.lineJoin  = 'round'
-  ctx.lineCap   = 'round'
-  ctx.lineWidth = 1.5
-
-  // ── Wing (Path2D — large swept-back delta shape) ─────────────────────
-  const wing = new Path2D()
-  wing.moveTo(-26, -4.5)
-  wing.lineTo(-70, -27)
-  wing.lineTo(-75, -22)
-  wing.bezierCurveTo(-70, -18, -60, -8, -58, -4.5)
-  wing.closePath()
-  ctx.fillStyle   = wingFill
-  ctx.strokeStyle = stroke
-  ctx.fill(wing)
-  ctx.stroke(wing)
-
-  // ── Vertical Tail Fin (Path2D) ────────────────────────────────────────
-  const vFin = new Path2D()
-  vFin.moveTo(-80, -4.5)
-  vFin.bezierCurveTo(-80, -10, -83, -17, -86, -24)
-  vFin.lineTo(-91, -4.5)
-  vFin.closePath()
-  ctx.fillStyle   = wingFill
-  ctx.strokeStyle = stroke
-  ctx.fill(vFin)
-  ctx.stroke(vFin)
-
-  // ── Horizontal Stabilizer (Path2D) ────────────────────────────────────
-  const hStab = new Path2D()
-  hStab.moveTo(-80, -4.5)
-  hStab.lineTo(-94, -15)
-  hStab.lineTo(-96, -11)
-  hStab.bezierCurveTo(-92, -8, -88, -5, -86, -4.5)
-  hStab.closePath()
-  ctx.fillStyle   = wingFill
-  ctx.strokeStyle = stroke
-  ctx.fill(hStab)
-  ctx.stroke(hStab)
-
-  // ── Fuselage (Path2D — main body drawn over wing/tail roots) ─────────
-  const fuselage = new Path2D()
-  fuselage.moveTo(0, 0)
-  fuselage.bezierCurveTo(-2,  -1.5, -6,  -4.5, -12, -5.2)
-  fuselage.bezierCurveTo(-18, -5.8, -22, -6.2, -28, -6)
-  fuselage.bezierCurveTo(-35, -5.8, -55, -5.2, -72, -4.8)
-  fuselage.bezierCurveTo(-80, -4.5, -87, -3.5, -92, -1.5)
-  fuselage.lineTo(-94, 0)
-  fuselage.bezierCurveTo(-88,  2,   -75,  3.2, -55, 3.5)
-  fuselage.bezierCurveTo(-35,  3.5, -18,  2.8,  -6, 1.2)
-  fuselage.bezierCurveTo(-3,   0.6,  -1,  0.2,   0, 0)
-  fuselage.closePath()
-  ctx.fillStyle   = bodyFill
-  ctx.strokeStyle = stroke
-  ctx.fill(fuselage)
-  ctx.stroke(fuselage)
-
-  // ── Cockpit Window (Path2D — no shadow, translucent tint) ────────────
-  ctx.shadowBlur = 0
-  const cockpit = new Path2D()
-  cockpit.moveTo(-6,  -4.5)
-  cockpit.bezierCurveTo(-10, -5.2, -16, -6.5, -24, -6.2)
-  cockpit.bezierCurveTo(-27, -6.0, -30, -5.5, -32, -4.8)
-  cockpit.lineTo(-10, -4.8)
-  cockpit.closePath()
-  ctx.fillStyle   = cockpitFill
-  ctx.strokeStyle = 'transparent'
-  ctx.fill(cockpit)
-
-  // ── Engine Nacelles (Path2D — twin rear-mounted pods, port & starboard) ──
-  if (!crashed) {
-    ctx.shadowColor = 'rgba(0,0,0,0.7)'
-    ctx.shadowBlur  = 4
-  }
-
-  // Port nacelle (lower, more visible from side view)
-  const enginePort = new Path2D()
-  enginePort.ellipse(-70, 3.5, 11, 3.0, -0.08, 0, Math.PI * 2)
-  ctx.fillStyle   = wingFill
-  ctx.strokeStyle = stroke
-  ctx.fill(enginePort)
-  ctx.stroke(enginePort)
-
-  // Port intake shadow
-  const intakePort = new Path2D()
-  intakePort.ellipse(-70, 3.5, 5, 2.0, -0.08, Math.PI, Math.PI * 2)
-  ctx.fillStyle   = 'rgba(0,0,0,0.35)'
-  ctx.strokeStyle = 'transparent'
-  ctx.fill(intakePort)
-
-  // Starboard nacelle (upper, slightly forward — opposite side of fuselage)
-  const engineStbd = new Path2D()
-  engineStbd.ellipse(-68, -7.5, 10, 2.8, -0.08, 0, Math.PI * 2)
-  ctx.fillStyle   = wingFill
-  ctx.strokeStyle = stroke
-  ctx.fill(engineStbd)
-  ctx.stroke(engineStbd)
-
-  // Starboard intake shadow
-  const intakeStbd = new Path2D()
-  intakeStbd.ellipse(-68, -7.5, 4.5, 1.8, -0.08, Math.PI, Math.PI * 2)
-  ctx.fillStyle   = 'rgba(0,0,0,0.35)'
-  ctx.strokeStyle = 'transparent'
-  ctx.fill(intakeStbd)
-
-  ctx.shadowBlur = 0
-  ctx.restore()
-}
-
-// ── Exhaust particles ──────────────────────────────────────────────────────
+// ── Sprite Plane ────────────────────────────────────────────────────────────
 
 function drawExhaust(
   ctx: CanvasRenderingContext2D,
   tailX: number,
   tailY: number,
   angleRad: number,
-  time: number
+  time: number,
+  intensity = 1
 ) {
   ctx.save()
   ctx.translate(tailX, tailY)
   ctx.rotate(-angleRad)
 
-  for (let i = 0; i < 14; i++) {
-    const offset = (time * 0.004 + i * 0.085) % 1
-    const x      = -offset * 60
-    const y      = Math.sin(time * 0.012 + i * 0.9) * 2.5
-    const size   = (1 - offset) * 5 + 1
-    const alpha  = (1 - offset) * 0.55
+  for (let i = 0; i < 24; i++) {
+    const t = ((time * 0.0065 + i * 0.062) % 1.35)
+    if (t > 1) continue
+    const dist = t * 82
+    const spread = Math.sin(time * 0.029 + i) * (3 + t * 2.5)
+    const size = (1 - t) * (7.5 + intensity * 4) + 1.8
 
     ctx.beginPath()
-    ctx.arc(x, y, size, 0, Math.PI * 2)
-    ctx.fillStyle = `rgba(0,230,118,${alpha})`
+    ctx.arc(-dist, spread, size, 0, Math.PI * 2)
+    ctx.fillStyle = i % 4 === 0
+      ? `rgba(255, 140, 30, ${(1 - t) * 0.9})`
+      : `rgba(100, 230, 255, ${(1 - t) * 0.55})`
     ctx.fill()
   }
 
+  ctx.restore()
+}
+
+function drawPlaneSprite(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  angleRad: number,
+  img: HTMLImageElement,
+  crashed = false
+) {
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.rotate(-angleRad)
+
+  const scale = crashed ? 0.72 : 0.78
+  const w = img.width * scale
+  const h = img.height * scale
+
+  ctx.drawImage(img, -w * 0.68, -h / 2, w, h)
+  ctx.restore()
+}
+
+function drawPlaneFallback(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  angleRad: number,
+  crashed = false
+) {
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.rotate(-angleRad)
+  ctx.beginPath()
+  ctx.moveTo(0, 0)
+  ctx.lineTo(-18, -6)
+  ctx.lineTo(-18, 6)
+  ctx.closePath()
+  ctx.fillStyle = crashed ? 'rgba(140,140,140,0.9)' : 'rgba(255,255,255,0.95)'
+  ctx.fill()
   ctx.restore()
 }
 
@@ -499,6 +407,16 @@ export function GameCanvas({
 }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rafRef    = useRef(0)
+  const planeImgRef = useRef<HTMLImageElement | null>(null)
+
+  useEffect(() => {
+    const img = new Image()
+    img.src = '/plane-sprite.png'
+    img.onload = () => { planeImgRef.current = img }
+    img.onerror = () => {
+      console.error('Failed to load plane sprite: /plane-sprite.png')
+    }
+  }, [])
 
   const render = useCallback(
     (time: number = 0) => {
@@ -530,45 +448,64 @@ export function GameCanvas({
       const isCrashing = phase === 'crashing'
       const isCrashed  = phase === 'crashed'
       const isFlying   = phase === 'flying'
-      const isWaiting  = phase === 'waiting'
 
       const dw      = CW - PAD.left - PAD.right
       const dh      = CH - PAD.top  - PAD.bottom
-      const originX = PAD.left
-      const originY = CH - PAD.bottom
 
       drawAxes(ctx, CW, CH)
       drawDots(ctx, CW, CH, time)
 
-      if (isWaiting) {
-        const WAIT_ANGLE = 0.433
-        const PLANE_LEN  = 94
-        const noseX  = originX + PLANE_LEN * Math.cos(WAIT_ANGLE)
-        const noseY  = originY - PLANE_LEN * Math.sin(WAIT_ANGLE)
-        drawPlane(ctx, noseX, noseY, WAIT_ANGLE, false)
-      }
-
-      // ── FLYING: trail + animated plane ──────────────────────────────
       if (isFlying && elapsedMs > 10) {
         drawTrail(ctx, CW, CH, elapsedMs)
-      }
-      if (isFlying && !plane.offScreen) {
-        const tailX    = PAD.left + plane.nx * dw
-        const tailY    = PAD.top  + (1 - plane.ny) * dh
-        const angleRad = (plane.angleDeg * Math.PI) / 180
-        const noseX    = tailX + 94 * Math.cos(angleRad)
-        const noseY    = tailY - 94 * Math.sin(angleRad)
-        drawExhaust(ctx, tailX, tailY, angleRad, time)
-        drawPlane(ctx, noseX, noseY, angleRad, false)
+
+        const currX = mapX(elapsedMs)
+        const currMult = computeMultiplier(elapsedMs)
+        const currY = mapY(currMult)
+
+        const tailX = PAD.left + currX * dw
+        const tailY = PAD.top + (1 - currY) * dh
+
+        let angleRad = -0.35
+        if (elapsedMs > 60) {
+          const prevMs = elapsedMs - ANGLE_CALC_LOOKBACK_MS
+          const prevMult = computeMultiplier(prevMs)
+          const dx = (mapX(elapsedMs) - mapX(prevMs)) * dw
+          const dy = (mapY(currMult) - mapY(prevMult)) * dh
+          angleRad = Math.atan2(-dy, dx)
+        }
+
+        const noseX = tailX + PLANE_LENGTH_PX * Math.cos(angleRad)
+        const noseY = tailY - PLANE_LENGTH_PX * Math.sin(angleRad)
+
+        const img = planeImgRef.current
+        drawExhaust(ctx, tailX, tailY, angleRad, time, NORMAL_FLIGHT_EXHAUST_INTENSITY)
+        if (img) drawPlaneSprite(ctx, noseX, noseY, angleRad, img, false)
+        else drawPlaneFallback(ctx, noseX, noseY, angleRad, false)
       }
 
-      if (isCrashing && !plane.offScreen) {
-        const tailX    = PAD.left + (plane.nx + plane.crashOffsetX) * dw
-        const tailY    = PAD.top  + (1 - (plane.ny + plane.crashOffsetY)) * dh
-        const angleRad = (plane.angleDeg * Math.PI) / 180
-        const noseX    = tailX + 94 * Math.cos(angleRad)
-        const noseY    = tailY - 94 * Math.sin(angleRad)
-        drawPlane(ctx, noseX, noseY, angleRad, true)
+      if ((isCrashing || isCrashed) && !plane.offScreen) {
+        const currX = mapX(elapsedMs)
+        const currMult = computeMultiplier(elapsedMs)
+        const currY = mapY(currMult)
+
+        const tailX = PAD.left + (currX + (plane.crashOffsetX || 0)) * dw
+        const tailY = PAD.top + (1 - (currY + (plane.crashOffsetY || 0))) * dh
+
+        let angleRad = -0.4
+        if (elapsedMs > 60) {
+          const prevMs = elapsedMs - ANGLE_CALC_LOOKBACK_MS
+          const dx = (mapX(elapsedMs) - mapX(prevMs)) * dw
+          const dy = (mapY(currMult) - mapY(computeMultiplier(prevMs))) * dh
+          angleRad = Math.atan2(-dy, dx) + CRASH_ANGLE_OFFSET_RAD
+        }
+
+        const noseX = tailX + PLANE_LENGTH_PX * Math.cos(angleRad)
+        const noseY = tailY - PLANE_LENGTH_PX * Math.sin(angleRad)
+
+        const img = planeImgRef.current
+        drawExhaust(ctx, tailX, tailY, angleRad, time, CRASH_EXHAUST_INTENSITY)
+        if (img) drawPlaneSprite(ctx, noseX, noseY, angleRad, img, true)
+        else drawPlaneFallback(ctx, noseX, noseY, angleRad, true)
       }
 
       rafRef.current = requestAnimationFrame(render)

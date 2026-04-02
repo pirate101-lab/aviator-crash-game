@@ -11,11 +11,17 @@ import { useGameState } from "@/hooks/useGameState";
 export default function AviatorGame() {
   const game = useGameState();
   const [betMode, setBetMode] = useState<"money" | "freebet">("money");
+  const toggleBetMode = () =>
+    setBetMode((prev) => (prev === "money" ? "freebet" : "money"));
 
-  const historyEntries = game.roundHistory.map((multiplier, index) => ({
-    multiplier,
-    timestamp: (index + 1) * 100_000 + Math.round(multiplier * 100),
-  }));
+  const now = Date.now();
+  const historyEntries = game.roundHistory.map((multiplier, index) => {
+    const ageFromLatest = game.roundHistory.length - index;
+    return {
+      multiplier,
+      timestamp: now - ageFromLatest * 1000,
+    };
+  });
 
   return (
     <div className="relative h-[100dvh] overflow-hidden bg-[#111111]">
@@ -44,35 +50,8 @@ export default function AviatorGame() {
                 elapsedMs={game.elapsedMs}
                 plane={game.plane}
                 betMode={betMode}
-                onToggleBetMode={() =>
-                  setBetMode((prev) => (prev === "money" ? "freebet" : "money"))
-                }
+                onToggleBetMode={toggleBetMode}
               />
-            </div>
-
-            <div className="flex flex-shrink-0 items-center justify-center gap-2 px-2 pb-2">
-              <button
-                type="button"
-                onClick={() => setBetMode("money")}
-                className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                  betMode === "money"
-                    ? "border-[#00E676] bg-[#00E676]/20 text-[#00E676]"
-                    : "border-white/20 text-white/60 hover:text-white"
-                }`}
-              >
-                Money
-              </button>
-              <button
-                type="button"
-                onClick={() => setBetMode("freebet")}
-                className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                  betMode === "freebet"
-                    ? "border-[#00E676] bg-[#00E676]/20 text-[#00E676]"
-                    : "border-white/20 text-white/60 hover:text-white"
-                }`}
-              >
-                Freebet
-              </button>
             </div>
 
             <div className="grid flex-shrink-0 grid-cols-2 gap-2 px-2 pb-2">

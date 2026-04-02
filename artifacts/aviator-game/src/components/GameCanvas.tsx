@@ -510,7 +510,7 @@ export function GameCanvas({
 
       rafRef.current = requestAnimationFrame(render)
     },
-    [phase, elapsedMs, plane]
+    [phase, elapsedMs, plane, multiplier]
   )
 
   useEffect(() => {

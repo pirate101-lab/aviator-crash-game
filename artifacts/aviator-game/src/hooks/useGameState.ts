@@ -28,6 +28,7 @@ const WAIT_MS           = 5000
 const CRASH_DISPLAY_MS  = 3000
 const FLY_AWAY_MS       = 700
 const MAX_HISTORY       = 20
+const FLY_UPDATE_INTERVAL_MS = 1000 / 60
 
 export function computeMultiplier(ms: number): number {
   return Math.pow(Math.E, 0.00006 * ms)
@@ -124,6 +125,7 @@ export function useGameState(): GameState {
   const planeRef     = useRef<PlaneTransform>(DEFAULT_PLANE)
   const nonceRef     = useRef(1)
   const serverSeedRef = useRef<string>('')
+  const lastFlyUpdateRef = useRef(0)
 
   const stop = useCallback(() => {
     if (raf.current) { cancelAnimationFrame(raf.current); raf.current = 0 }
@@ -176,9 +178,15 @@ export function useGameState(): GameState {
     setPhase('flying'); setMultiplier(1); setElapsedMs(0)
     setPlane({ ...DEFAULT_PLANE })
     tStart.current = performance.now()
+    lastFlyUpdateRef.current = 0
 
     const tick = (now: number) => {
       if (phaseRef.current !== 'flying') return
+      if (now - lastFlyUpdateRef.current < FLY_UPDATE_INTERVAL_MS) {
+        raf.current = requestAnimationFrame(tick)
+        return
+      }
+      lastFlyUpdateRef.current = now
       const el   = now - tStart.current
       const mult = computeMultiplier(el)
       const cp   = cpRef.current

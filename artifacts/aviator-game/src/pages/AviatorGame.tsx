@@ -54,17 +54,4 @@ export default function AviatorGame() {
               />
             </div>
 
-            <div className="grid flex-shrink-0 grid-cols-2 gap-2 px-2 pb-2">
-              <BetPanel defaultAmount={25} currency="KSH" />
-              <BetPanel defaultAmount={18} currency="KSH" />
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-hidden min-[769px]:hidden">
-              <LiveBetsSidebar phase={game.phase} variant="bottom" />
-            </div>
-          </main>
-        </div>
-      </div>
-    </div>
-  );
-}
+            <div className="grid flex-shrink-0 grid-cols-2 gap-2 px-2 pb-2"

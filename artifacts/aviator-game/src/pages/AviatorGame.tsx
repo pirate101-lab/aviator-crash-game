@@ -51,8 +51,8 @@ export default function AviatorGame() {
 
           {/* Bet panels — two side by side */}
           <div className="flex-shrink-0 grid grid-cols-2 gap-2 px-2 pb-2">
-            <BetPanel defaultAmount={25} currency="KSH" />
-            <BetPanel defaultAmount={18} currency="KSH" />
+            <BetPanel defaultAmount={25} currency="KSH" phase={game.phase} multiplier={game.multiplier} />
+            <BetPanel defaultAmount={18} currency="KSH" phase={game.phase} multiplier={game.multiplier} />
           </div>
 
           {/* Live bets — mobile only (<=768px), below bet panels */}
